@@ -18,6 +18,18 @@ const { beliefs } = useSemantic<Note>('notes about the launch')
 - **On-device**: embeddings via transformers.js in a worker, or precomputed at build time. No server, no LLM, no API key.
 - **No second state manager**: keep exact state wherever you already do; this layer only ranks.
 
+## Use cases
+
+| Use case | Status |
+|---|---|
+| **Inbox / notification triage** — support desks, dev tools, CRM feeds: learns the user's focus from clicks, ignores keyword spam | Demonstrated: [inbox example](examples/inbox) (5/5 vs rules 1–2/5) |
+| **Catalogue discovery** — products, templates, docs: free-text search + "more like this" with several interests at once | Demonstrated: [Pokédex example](examples/pokedex) |
+| **Privacy-sensitive apps** — health, legal, HR: text is ranked in the browser, never sent to an API | Good fit |
+| **Personalisation without an ML backend** — no profile service, no per-query cost | Good fit |
+
+Other languages work with a multilingual model (checked with Chinese; the default model is English-only). Details, code sketches and **when not to use it**:
+[docs/use-cases.md](docs/use-cases.md).
+
 ## Install
 
 ```bash

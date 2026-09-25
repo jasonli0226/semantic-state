@@ -18,7 +18,8 @@
     "coverage": "vitest run --coverage",
     "e2e": "playwright test",
     "eval:inbox": "npm run eval -w examples/inbox",
-    "eval:pokedex": "npm run eval -w examples/pokedex"
+    "eval:pokedex": "npm run eval -w examples/pokedex",
+    "publish:experimental": "npm publish -w packages/semantic-state --tag experimental"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",

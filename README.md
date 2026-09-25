@@ -1,5 +1,8 @@
 # Semantic state — `useSemantic()` for React
 
+> **Experimental.** A weekend research project, not a library: APIs change without notice, there is no npm package,
+> and the numbers below come from small synthetic datasets. Use it to explore the idea, not in production.
+
 A weekend experiment: can React state be **ranked by meaning instead of looked up by key**, fully on-device, and does a
 dedicated hook earn its keep over "just a Redux selector with embeddings"?
 

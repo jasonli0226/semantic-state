@@ -5,7 +5,7 @@ links to an issue where the details and progress live. Suggestions welcome — o
 
 ## Now — make 0.1.x usable
 
-| Issue |
+| Item | Issue |
 |---|---|
 | Hooks throw during server rendering (missing `getServerSnapshot`) | [#9](https://github.com/jasonli0226/semantic-state/issues/9) |
 | CI: typecheck, lint, unit tests and E2E on every PR | [#5](https://github.com/jasonli0226/semantic-state/issues/5) |
@@ -15,7 +15,7 @@ links to an issue where the details and progress live. Suggestions welcome — o
 
 ## Next — 0.2
 
-| Issue |
+| Item | Issue |
 |---|---|
 | Persist vectors in IndexedDB so reloads don't re-embed | [#10](https://github.com/jasonli0226/semantic-state/issues/10) |
 | Approximate nearest-neighbour index for collections beyond ~10k items | [#11](https://github.com/jasonli0226/semantic-state/issues/11) |
@@ -24,7 +24,7 @@ links to an issue where the details and progress live. Suggestions welcome — o
 
 ## Later — exploring
 
-| Issue |
+| Item | Issue |
 |---|---|
 | Optional LLM re-ranking, opt-in, with prompt-injection guardrails | [#14](https://github.com/jasonli0226/semantic-state/issues/14) |
 | Better duplicate and negation handling | [#15](https://github.com/jasonli0226/semantic-state/issues/15) |

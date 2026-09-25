@@ -110,6 +110,16 @@ Spread `panelProps` on the list: pointer and keyboard activity inside it holds t
 `panelProps`, `status`, `model` (download progress), `rankMs`, `itemCount`, `networkRequests`, `query`, `resultQuery`.
 While a new query is being ranked, the previous results stay on screen (`resultQuery` tells you which).
 
+## Languages and data types
+
+- **Language:** set by the model. `Xenova/all-MiniLM-L6-v2` (23 MB) is English-only; for other or mixed languages use a
+  multilingual model such as `Xenova/paraphrase-multilingual-MiniLM-L12-v2` (118 MB) — it scored 8/8 vs 5/8 on a small
+  Chinese/English check. Precomputed vectors must use the same model as queries.
+- **Numbers and categories:** put them in `features` as their own vectors (normalised values, one-hot categories), not
+  in the embedded text.
+
+More in [docs/use-cases.md](../../docs/use-cases.md).
+
 ## Limits (v0.1)
 
 - In-memory index only (no IndexedDB persistence); a linear scan is fine to ~10k items.

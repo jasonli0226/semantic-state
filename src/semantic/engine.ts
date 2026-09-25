@@ -1,6 +1,7 @@
 import type { Item, Vec } from '../core/types.ts'
 import type { InteractionKind } from './config.ts'
 import type { EmbeddedVector, FromWorker, QueryResult, ToWorker } from './protocol.ts'
+import { subscribable } from './subscribable.ts'
 
 /**
  * Main-thread handle on the semantic worker: a framework-free external store
@@ -44,17 +45,6 @@ export interface SemanticEngine {
 }
 
 const INITIAL: EngineSnapshot = { status: 'idle', progress: 0, error: null, results: {}, lastEmbedMs: null }
-
-function subscribable<T extends unknown[]>() {
-  const listeners = new Set<(...args: T) => void>()
-  return {
-    add(listener: (...args: T) => void) {
-      listeners.add(listener)
-      return () => void listeners.delete(listener)
-    },
-    emit: (...args: T) => listeners.forEach((listener) => listener(...args)),
-  }
-}
 
 function reduce(snapshot: EngineSnapshot, message: FromWorker): EngineSnapshot {
   switch (message.type) {

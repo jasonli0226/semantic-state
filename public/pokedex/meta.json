@@ -1,0 +1,7 @@
+{
+  "model": "Xenova/all-MiniLM-L6-v2",
+  "dtype": "q8",
+  "dims": 384,
+  "count": 1025,
+  "source": "PokeAPI CSV (github.com/PokeAPI/pokeapi)"
+}

@@ -4,13 +4,14 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   plugins: [react()],
   worker: { format: 'es' },
+  build: { rolldownOptions: { input: { main: 'index.html', pokedex: 'pokedex.html' } } },
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.test.{ts,tsx}'],
     coverage: {
       provider: 'v8',
-      include: ['src/core/**', 'src/semantic/engine.ts', 'src/semantic/useCommitPolicy.ts', 'src/semantic/useActivity.ts', 'src/app/**'],
+      include: ['src/core/**', 'src/semantic/engine.ts', 'src/semantic/useCommitPolicy.ts', 'src/semantic/useActivity.ts', 'src/app/**', 'src/pokedex/{data,features,rank,engine}.ts'],
       exclude: ['**/*.test.*'],
     },
   },

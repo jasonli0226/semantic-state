@@ -12,7 +12,9 @@
     "coverage": "vitest run --coverage",
     "eval": "node scripts/eval.ts",
     "e2e": "playwright test",
-    "pairs": "node scripts/pairs.ts"
+    "pairs": "node scripts/pairs.ts",
+    "build:pokedex": "node scripts/build-pokedex.ts",
+    "eval:pokedex": "node scripts/eval-pokedex.ts"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.3.0",
@@ -27,12 +29,14 @@
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
     "@types/node": "^24.13.3",
+    "@types/papaparse": "^5.5.2",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^6.1.1",
     "@vitest/coverage-v8": "^5.0.2",
     "jsdom": "^29.1.1",
     "oxlint": "^1.81.0",
+    "papaparse": "^5.7.0",
     "typescript": "~6.0.2",
     "vite": "^8.3.0",
     "vitest": "^5.0.2"

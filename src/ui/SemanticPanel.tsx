@@ -1,27 +1,10 @@
 import { useMemo } from 'react'
-import type { Moves } from '../core/commit.ts'
 import { ATTENTION_QUERY, VISIBLE_ROWS } from '../semantic/config.ts'
 import { useSemantic } from '../semantic/useSemantic.ts'
 import { Panel } from './Panel.tsx'
+import { PendingBanner } from './PendingBanner.tsx'
 import { useSettings } from './settings.ts'
 import { formatMs, formatPrecision, usePrecisionAt5, useRowRenderer } from './useRowRenderer.tsx'
-
-function PendingBanner({ pending, manual, onCommit }: { pending: Moves; manual: boolean; onCommit: () => void }) {
-  if (pending.movedUp + pending.added === 0) return null
-  const parts = [pending.movedUp > 0 && `${pending.movedUp} moved up`, pending.added > 0 && `${pending.added} new`].filter(Boolean)
-  return (
-    <div className="pending" role="status">
-      <span>{parts.join(' · ')}</span>
-      {manual ? (
-        <button type="button" onClick={onCommit}>
-          Refresh
-        </button>
-      ) : (
-        <span className="pending-hint">applies when you pause</span>
-      )}
-    </div>
-  )
-}
 
 function ModelBanner({ status, progress, error }: { status: string; progress: number; error: string | null }) {
   if (status === 'error') return <div className="banner banner-error">Semantic layer unavailable: {error}</div>

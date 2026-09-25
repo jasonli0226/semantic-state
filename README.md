@@ -14,6 +14,9 @@ the same data:
 
 ![Payments phase after the spam wave](docs/demo-payments.png)
 
+There is a second demo: a **Semantic Pokédex** (`/pokedex.html`) — free-text search plus click-based similarity over
+all 1025 Pokémon, with no Redux at all. See [below](#semantic-pokédex).
+
 ## Run it
 
 ```bash
@@ -23,6 +26,8 @@ npm test           # unit tests (vitest)
 npm run coverage
 npm run e2e        # Playwright against system Chrome
 npm run eval       # headless scenario with real embeddings in Node; prints precision@5 per step
+npm run eval:pokedex   # search / multi-interest / weight checks on the real Pokédex
+npm run build:pokedex  # re-download PokeAPI CSVs and rebuild public/pokedex/ (~3s; output is committed)
 ```
 
 The inbox is plain data in [`src/data/inbox.json`](src/data/inbox.json) — edit or replace it to try your own scenario.
@@ -53,7 +58,7 @@ Latency (Chrome, this laptop):
 | Embed one new item (worker) | a few ms | — |
 | LLM / network calls in the ranking path | **0** (measured, shown in the panel) | **0** |
 
-## What I learned (honest version)
+## What I learned
 
 - **The semantic ranking works; the win is adaptation, not magic.** Cold start ties with rules. After three clicks the
   centroid beats rules clearly, and it follows the user to a new focus (hiring) with no rules rewritten.
@@ -122,3 +127,51 @@ The ONNX Runtime wasm is ~27 MB (6.8 MB gzipped).
 - Confidence is uncalibrated: it is centroid similarity × history. In the hiring phase "Q3 all-hands reminder"
   shows near-full confidence because meetings embed close to "hiring committee sync".
 - Embedding staleness: handled — the worker re-embeds an item when its text changes.
+
+## Semantic Pokédex
+
+![Clicking Squirtle then Charmander](docs/pokedex-clicks.png)
+
+`usePokedex()` returns `Belief<Pokemon>` (with a reason: *matches “…”* or *like Charmander*) straight from a worker —
+no Redux, no second store. Same commit policy as the inbox.
+
+- **Free-text search**: type “ghost that haunts old houses” and the query is embedded on-device and matched against
+  Pokédex descriptions. The model (~23 MB) is only downloaded on the first search.
+- **Clicks**: each click becomes an interest; results are ranked by their best match among recent clicks.
+- **The Pokédex grid never re-orders** — people expect #0001 → #1025. Ranking lives in a separate panel.
+- **Hybrid similarity** with sliders: description embedding + type one-hot + stat-spread shape.
+- **One result per evolution family** (“+2 in family”), and a **Similar to X** list that skips its own family.
+
+### How it's built
+
+- `scripts/build-pokedex.ts` turns PokeAPI's CSV dump into `public/pokedex/pokedex.json` (416 KB) and embeds every entry
+  in Node into `vectors.bin` (1.6 MB, 1025 × 384 float32). The page loads those instead of embedding 1025 texts on start,
+  so clicks work instantly without the model.
+- Both files are validated in the worker (zod schema, byte-size check) before use.
+- `src/pokedex/rank.ts`: multi-interest scoring, family grouping, interest lanes, “similar to”.
+
+### Results (`npm run eval:pokedex`)
+
+| Check | Result |
+|---|---|
+| Free-text search, share of top 10 with the expected type (8 queries) | **0.91** — e.g. “ghost that haunts old houses” → Chandelure, Haunter, Misdreavus, Banette |
+| Click Squirtle, then Charmander — single averaged centroid | 0% water, 100% fire |
+| Same clicks — multi-interest + lanes | **40% water, 60% fire** (Charmeleon, Litten, Wartortle, Charcadet, Totodile…) |
+| Similar to Pikachu, description only / type only / stats only | Pawmot, Sandslash… / Jolteon, Raikou… / Diglett, Meowth… |
+
+### What I learned
+
+- **Taking the max over interests is not enough.** The newest click has the highest weight, so it won every slot —
+  “Squirtle then Charmander” was all fire. Fixed with greedy interest lanes (each extra pick from one lane ×0.8).
+- **A second bug hid behind the first.** The commit policy re-sorts by score for hysteresis, which silently undid the
+  lane order in the browser while the Node eval looked fine. The lanes now emit their discounted score, which never
+  increases down the list. Only the E2E test caught it.
+- **Stats-only similarity is technically right and useless** (Pikachu ≈ Diglett: same fast, frail spread). It shows why
+  “similar” needs a human-chosen blend, hence the sliders.
+- **Text models miss some combinations**: “frozen bird” returns flying types (Fearow, Pidgey) but no Articuno. The type
+  share is 10/10 only because flying counts.
+- Confidence is uncalibrated (similarity mapped to 0–1).
+
+Data from [PokeAPI](https://pokeapi.co). Pokémon names and sprites © Nintendo / Game Freak / Creatures; sprites are loaded
+from the PokeAPI sprites repo. Personal, non-commercial demo.
+

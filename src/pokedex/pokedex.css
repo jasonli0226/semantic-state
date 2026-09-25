@@ -1,0 +1,86 @@
+/* Pokédex page — builds on the tokens and .panel / .row / .stat styles in index.css */
+.type-normal { --t: #9fa19f; } .type-fire { --t: #e62829; } .type-water { --t: #2980ef; } .type-electric { --t: #d6a800; }
+.type-grass { --t: #3fa129; } .type-ice { --t: #3dcef3; } .type-fighting { --t: #ff8000; } .type-poison { --t: #9141cb; }
+.type-ground { --t: #915121; } .type-flying { --t: #81b9ef; } .type-psychic { --t: #ef4179; } .type-bug { --t: #91a119; }
+.type-rock { --t: #afa981; } .type-ghost { --t: #704170; } .type-dragon { --t: #5060e1; } .type-dark { --t: #624d4e; }
+.type-steel { --t: #60a1b8; } .type-fairy { --t: #ef70ef; }
+
+a { color: var(--semantic); }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.link { border: 0; background: none; padding: 0; color: var(--semantic); text-decoration: underline; text-underline-offset: 2px; font-size: inherit; }
+.error { color: var(--bad); }
+.empty { color: var(--muted); padding: 16px; margin: 0; }
+
+.types { display: inline-flex; gap: 4px; flex-wrap: wrap; }
+.type {
+  font-size: 0.64rem; text-transform: uppercase; letter-spacing: 0.04em; font-weight: 700; padding: 1px 6px; border-radius: 999px;
+  color: color-mix(in srgb, var(--t) 70%, var(--text)); background: color-mix(in srgb, var(--t) 16%, var(--surface));
+}
+
+/* Search */
+.searchbar { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px; box-shadow: var(--shadow); display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 24px; margin-bottom: 12px; }
+@media (max-width: 900px) { .searchbar { grid-template-columns: minmax(0, 1fr); } }
+.search input { width: 100%; font-size: 1.1rem; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); }
+.examples, .model-status { margin: 0; font-size: 0.82rem; color: var(--muted); grid-column: 1; }
+.examples .link { margin-right: 10px; }
+.model-status progress { vertical-align: middle; width: 120px; accent-color: var(--semantic); }
+.weights { grid-column: 2; grid-row: 1 / span 3; display: flex; flex-direction: column; gap: 6px; min-width: 220px; }
+@media (max-width: 900px) { .weights { grid-column: 1; grid-row: auto; } }
+.weights label { display: grid; gap: 2px; font-size: 0.82rem; }
+.weights label span { display: flex; justify-content: space-between; }
+.weights output { font-variant-numeric: tabular-nums; color: var(--muted); }
+.weights input { accent-color: var(--semantic); }
+
+/* Interests */
+.interests { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; font-size: 0.85rem; }
+.interests ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.interests-label { color: var(--muted); }
+.interest { display: flex; align-items: center; gap: 4px; padding: 2px 4px 2px 2px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); }
+.interest button { border: 0; background: none; color: var(--muted); font-size: 1rem; line-height: 1; padding: 0 4px; }
+
+/* Layout */
+.dex-layout { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 16px; align-items: start; }
+@media (max-width: 1000px) { .dex-layout { grid-template-columns: minmax(0, 1fr); } .sidebar { order: -1; } }
+.sidebar { position: sticky; top: 12px; display: flex; flex-direction: column; gap: 12px; max-height: calc(100vh - 24px); overflow: auto; }
+@media (max-width: 1000px) { .sidebar { position: static; max-height: none; } }
+
+/* Grid */
+.dex { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; }
+.card {
+  width: 100%; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 6px 4px 10px; border-radius: 12px;
+  border: 1px solid var(--line); background: var(--surface); content-visibility: auto; contain-intrinsic-size: 118px 150px;
+}
+.card:hover { background: var(--surface-2); }
+.card-interest { border-color: var(--semantic); box-shadow: 0 0 0 calc(1px + var(--interest, 0) * 2px) color-mix(in srgb, var(--semantic) 60%, transparent); }
+.card-selected { background: color-mix(in srgb, var(--semantic) 10%, var(--surface)); }
+.card-no { font-size: 0.7rem; color: var(--muted); font-variant-numeric: tabular-nums; margin: 0; }
+.card-name { font-weight: 600; font-size: 0.86rem; text-align: center; }
+.sprite { image-rendering: pixelated; flex: none; }
+
+/* Ranked panel */
+.ranked .rows { max-height: none; }
+.ranked-row { flex-direction: row; align-items: center; gap: 8px; }
+.ranked-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.reason { font-style: italic; }
+.reason-search { color: var(--baseline); }
+.reason-interest { color: var(--semantic); }
+
+/* Detail */
+.detail { position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; box-shadow: var(--shadow); }
+.detail-close { position: absolute; top: 8px; right: 10px; border: 0; background: none; font-size: 1.3rem; color: var(--muted); }
+.detail-head { display: flex; gap: 12px; align-items: center; }
+.detail-head img { flex: none; }
+.detail h2 { margin: 0; font-size: 1.3rem; }
+.detail h3 { margin: 12px 0 0; font-size: 0.95rem; }
+.genus { margin: 0 0 4px; color: var(--muted); font-size: 0.85rem; }
+.flavor { font-size: 0.88rem; margin: 10px 0; }
+.hint { margin: 2px 0 6px; font-size: 0.78rem; color: var(--muted); }
+.statbars { display: grid; gap: 3px; margin: 0; }
+.statbars div { display: grid; grid-template-columns: 34px 1fr; align-items: center; gap: 6px; font-size: 0.75rem; }
+.statbars dt { color: var(--muted); }
+.statbars dd { margin: 0; position: relative; height: 12px; background: var(--surface-2); border-radius: 6px; }
+.bar { position: absolute; inset: 0 auto 0 0; background: var(--semantic); border-radius: 6px; opacity: 0.75; }
+.bar-value { position: absolute; right: 6px; top: -1px; font-variant-numeric: tabular-nums; }
+.similar { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.similar button { width: 100%; border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 4px; display: flex; flex-direction: column; align-items: center; font-size: 0.78rem; }
+.similar button:hover { background: var(--surface-2); }

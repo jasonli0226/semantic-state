@@ -28,6 +28,9 @@ export function Header({ policy, onPolicy, showAnswerKey, onShowAnswerKey, engin
   return (
     <header className="app-head">
       <div className="brand">
+        <p className="kicker">
+          <a href="./pokedex.html">Pokédex demo →</a>
+        </p>
         <h1>Semantic state</h1>
         <p>Dev inbox, Monday morning — rules vs a semantic layer vs the same idea as a Redux selector. Everything runs on this device.</p>
       </div>

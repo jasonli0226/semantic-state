@@ -6,7 +6,7 @@ const rankedNames = (page: Page, n = 15) =>
 const card = (page: Page, name: string) => page.getByRole('list', { name: 'Pokédex' }).getByRole('button', { name: new RegExp(`\\b${name}\\b`) })
 
 async function open(page: Page) {
-  await page.goto('/pokedex.html')
+  await page.goto('/')
   await expect(page.getByRole('list', { name: 'Pokédex' }).getByRole('listitem')).toHaveCount(1025, { timeout: 30_000 })
 }
 

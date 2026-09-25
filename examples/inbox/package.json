@@ -1,0 +1,21 @@
+{
+  "name": "semantic-state-example-inbox",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Dev inbox: hand-written rules vs useSemantic with an attention centroid.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -p tsconfig.json && vite build",
+    "preview": "vite preview",
+    "eval": "node scripts/eval.ts",
+    "pairs": "node scripts/pairs.ts"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "^4.3.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "semantic-state": "0.1.0-experimental.0",
+    "zod": "^4.6.5"
+  }
+}

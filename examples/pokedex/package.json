@@ -1,0 +1,25 @@
+{
+  "name": "semantic-state-example-pokedex",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Semantic Pok\u00e9dex: free-text search and multi-interest similarity over 1025 Pok\u00e9mon.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -p tsconfig.json && vite build",
+    "preview": "vite preview",
+    "eval": "node scripts/eval-pokedex.ts",
+    "build:data": "node scripts/build-pokedex.ts"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "^4.3.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "semantic-state": "0.1.0-experimental.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "papaparse": "^5.7.0",
+    "@types/papaparse": "^5.5.2"
+  }
+}

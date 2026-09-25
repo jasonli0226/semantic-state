@@ -26,10 +26,10 @@ import {
   similarTo,
 } from 'semantic-state/core'
 import { decodeVectorFile } from 'semantic-state/worker'
-import { parsePokedex } from '../src/pokedex/data.ts'
-import { pokedexFeatures } from '../src/pokedex/features.ts'
-import { DEFAULT_WEIGHTS, type Pokemon, type PokemonType } from '../src/pokedex/types.ts'
-import { EMBEDDING_MODEL } from '../src/semantic/config.ts'
+import { parsePokedex } from '../src/data.ts'
+import { pokedexFeatures } from '../src/features.ts'
+import { DEFAULT_WEIGHTS, type Pokemon, type PokemonType } from '../src/types.ts'
+import { EMBEDDING_MODEL } from '../src/config.ts'
 
 const pokedex = parsePokedex(JSON.parse(await readFile('public/pokedex/pokedex.json', 'utf8')))
 const meta = JSON.parse(await readFile('public/pokedex/meta.json', 'utf8'))

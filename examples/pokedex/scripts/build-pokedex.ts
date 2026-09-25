@@ -7,9 +7,9 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { pipeline } from '@huggingface/transformers'
 import Papa from 'papaparse'
-import { embeddingTextFor, parsePokedex } from '../src/pokedex/data.ts'
-import type { Pokemon, StatKey } from '../src/pokedex/types.ts'
-import { EMBEDDING_MODEL } from '../src/semantic/config.ts'
+import { embeddingTextFor, parsePokedex } from '../src/data.ts'
+import type { Pokemon, StatKey } from '../src/types.ts'
+import { EMBEDDING_MODEL } from '../src/config.ts'
 
 const CSV_BASE = 'https://raw.githubusercontent.com/PokeAPI/pokeapi/master/data/v2/csv'
 const CACHE_DIR = 'node_modules/.cache/pokeapi'

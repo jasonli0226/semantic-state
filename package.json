@@ -1,46 +1,38 @@
 {
-  "name": "ai-context-state",
+  "name": "semantic-state-workspace",
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "description": "Experimental: semantic-state library for React, with examples.",
+  "workspaces": [
+    "packages/*",
+    "examples/*"
+  ],
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
+    "dev:inbox": "npm run dev -w examples/inbox",
+    "dev:pokedex": "npm run dev -w examples/pokedex",
+    "build": "npm run build -w examples/inbox -w examples/pokedex",
+    "typecheck": "tsc -p packages/semantic-state && tsc -p examples/inbox && tsc -p examples/pokedex && tsc -p tsconfig.node.json",
     "lint": "oxlint",
-    "preview": "vite preview",
     "test": "vitest run",
     "coverage": "vitest run --coverage",
-    "eval": "node scripts/eval.ts",
     "e2e": "playwright test",
-    "pairs": "node scripts/pairs.ts",
-    "build:pokedex": "node scripts/build-pokedex.ts",
-    "eval:pokedex": "node scripts/eval-pokedex.ts"
-  },
-  "dependencies": {
-    "@huggingface/transformers": "^4.3.0",
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8",
-    "semantic-state": "0.1.0-experimental.0",
-    "zod": "^4.6.5"
+    "eval:inbox": "npm run eval -w examples/inbox",
+    "eval:pokedex": "npm run eval -w examples/pokedex"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
     "@types/node": "^24.13.3",
-    "@types/papaparse": "^5.5.2",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^6.1.1",
     "@vitest/coverage-v8": "^5.0.2",
     "jsdom": "^29.1.1",
     "oxlint": "^1.81.0",
-    "papaparse": "^5.7.0",
     "typescript": "~6.0.2",
     "vite": "^8.3.0",
     "vitest": "^5.0.2"
-  },
-  "workspaces": [
-    "packages/*"
-  ]
+  }
 }

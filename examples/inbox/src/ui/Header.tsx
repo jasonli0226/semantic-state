@@ -1,4 +1,5 @@
 import { activeItems } from '../app/inboxStore.ts'
+import { REPO_URL } from '../links.ts'
 import type { CommitPolicy } from 'semantic-state'
 import { useInboxActions, useInboxState } from './actionsContext.ts'
 import { useLongTasks } from './useLongTasks.ts'
@@ -28,7 +29,7 @@ export function Header({ policy, onPolicy, showAnswerKey, onShowAnswerKey, engin
     <header className="app-head">
       <div className="brand">
         <p className="kicker">
-          <a href="./pokedex.html">Pokédex demo →</a>
+          <a href={REPO_URL}>semantic-state example</a>
         </p>
         <h1>Semantic state</h1>
         <p>Dev inbox, Monday morning — hand-written rules vs a semantic layer (semantic-state). Everything runs on this device.</p>

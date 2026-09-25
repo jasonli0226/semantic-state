@@ -1,6 +1,6 @@
 import { transformersEmbedder } from 'semantic-state/transformers'
 import { defineSemanticWorker, fetchVectorFile } from 'semantic-state/worker'
-import { EMBEDDING_MODEL } from '../semantic/config.ts'
+import { EMBEDDING_MODEL } from './config.ts'
 import { embeddingTextFor } from './data.ts'
 import { pokedexFeatures } from './features.ts'
 import { DEFAULT_WEIGHTS, type Pokemon, RESULT_LIMIT } from './types.ts'

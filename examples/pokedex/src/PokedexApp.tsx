@@ -1,6 +1,7 @@
 import type { CommitPolicy } from 'semantic-state'
 import { useSemantic, useSemanticSnapshot, useSemanticStore, useSimilar } from 'semantic-state/react'
 import { useCallback, useMemo, useState } from 'react'
+import { REPO_URL } from './config.ts'
 import { DEFAULT_WEIGHTS, type Pokemon, type SimilarityWeights } from './types.ts'
 import { DetailCard } from './ui/DetailCard.tsx'
 import { DexGrid } from './ui/DexGrid.tsx'
@@ -39,7 +40,7 @@ export default function PokedexApp({ pokedex }: { pokedex: readonly Pokemon[] })
       <header className="app-head">
         <div className="brand">
           <p className="kicker">
-            <a href="./">← Inbox demo</a>
+            <a href={REPO_URL}>semantic-state example</a>
           </p>
           <h1>Semantic Pokédex</h1>
           <p>

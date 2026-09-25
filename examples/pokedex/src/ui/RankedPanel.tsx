@@ -1,12 +1,13 @@
 import { type HTMLAttributes, useRef } from 'react'
-import { PendingBanner } from '../../ui/PendingBanner.tsx'
-import { useFlip } from '../../ui/useFlip.ts'
-import { formatMs } from '../../ui/useRowRenderer.tsx'
+import { PendingBanner } from './PendingBanner.tsx'
+import { useFlip } from './useFlip.ts'
 import type { Pokemon } from '../types.ts'
 import type { Belief, Id } from 'semantic-state'
 import { Sprite, TypeChips } from './bits.tsx'
 
 const VISIBLE = 15
+
+const formatMs = (ms: number | null) => (ms === null ? '—' : `${ms < 1 ? ms.toFixed(2) : ms.toFixed(1)} ms`)
 
 function reasonText(belief: Belief<Pokemon>, query: string, byId: ReadonlyMap<number, Pokemon>): string {
   if (belief.reason.kind === 'search') return `matches “${query}”`

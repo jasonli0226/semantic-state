@@ -25,6 +25,10 @@ npm run e2e        # Playwright against system Chrome
 npm run eval       # headless scenario with real embeddings in Node; prints precision@5 per step
 ```
 
+The inbox is plain data in [`src/data/inbox.json`](src/data/inbox.json) — edit or replace it to try your own scenario.
+Times are relative to `demoNow` (`dueInHours`, `ageHours`); `topic` + `actionable` form the answer key and never reach
+the ranking code. The file is validated with zod on load; `arrivals.refund` and `arrivals.spam` are used by steps 3–4.
+
 Click the scenario steps in order: **Cold start → Work on payments → New item arrives → Spam wave → Switch to hiring**.
 Click rows to "open" them (this trains the centroid), ✓ to mark done. The orange dot is the answer key for the current focus.
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ARRIVALS, DEMO_NOW, groundTruth, initialItems } from './dataset.ts'
+import { ARRIVALS, DEMO_NOW, groundTruth, initialItems, parseDataset } from './dataset.ts'
 
 const all = [...initialItems, ...Object.values(ARRIVALS)]
 
@@ -33,5 +33,33 @@ describe('dataset', () => {
 
   it('does not leak ground-truth fields into items', () => {
     for (const item of all) expect(Object.keys(item).sort()).toEqual(['body', 'createdAt', 'dueAt', 'id', 'labels', 'sender', 'source', 'title'])
+  })
+})
+
+describe('parseDataset', () => {
+  const valid = {
+    demoNow: '2026-09-28T01:00:00.000Z',
+    items: [{ id: 'a', topic: 'payments', actionable: true, source: 'ci', sender: 's', title: 't', body: '', labels: [], ageHours: 2, dueInHours: 5 }],
+    arrivals: {},
+  }
+
+  it('converts relative hours to timestamps and splits out ground truth', () => {
+    const parsed = parseDataset(valid)
+    const now = Date.parse(valid.demoNow)
+    expect(parsed.items[0]).toEqual({ id: 'a', source: 'ci', sender: 's', title: 't', body: '', labels: [], dueAt: now + 5 * 3_600_000, createdAt: now - 2 * 3_600_000 })
+    expect(parsed.groundTruth.payments.has('a')).toBe(true)
+  })
+
+  it('rejects an unknown source with a readable message', () => {
+    const bad = { ...valid, items: [{ ...valid.items[0], source: 'fax' }] }
+    expect(() => parseDataset(bad)).toThrow(/inbox\.json.*items\.0\.source/s)
+  })
+
+  it('rejects duplicate ids', () => {
+    expect(() => parseDataset({ ...valid, items: [valid.items[0], valid.items[0]] })).toThrow(/duplicate id "a"/)
+  })
+
+  it('rejects an invalid demo clock', () => {
+    expect(() => parseDataset({ ...valid, demoNow: 'monday' })).toThrow(/demoNow/)
   })
 })

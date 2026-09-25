@@ -8,8 +8,8 @@
     "dev": "vite",
     "build": "tsc -p tsconfig.json && vite build",
     "preview": "vite preview",
-    "eval": "node scripts/eval-pokedex.ts",
-    "build:data": "node scripts/build-pokedex.ts"
+    "eval": "node --conditions=source scripts/eval-pokedex.ts",
+    "build:data": "node --conditions=source scripts/build-pokedex.ts"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.3.0",

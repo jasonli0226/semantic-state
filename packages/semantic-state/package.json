@@ -1,24 +1,83 @@
 {
   "name": "semantic-state",
   "version": "0.1.0-experimental.0",
-  "private": true,
-  "description": "Experimental: semantic state for React — rank items by meaning, on-device, in a Web Worker, with a commit policy that keeps lists still while you use them.",
+  "description": "Experimental React library: rank state by meaning, on-device. useSemantic() hooks, Web Worker embeddings, and a commit policy that keeps lists still while you use them.",
+  "keywords": [
+    "react",
+    "hooks",
+    "semantic-search",
+    "embeddings",
+    "state-management",
+    "web-worker",
+    "transformers-js",
+    "on-device"
+  ],
   "license": "MIT",
+  "author": "jasonli0226",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jasonli0226/semantic-state.git",
+    "directory": "packages/semantic-state"
+  },
+  "homepage": "https://github.com/jasonli0226/semantic-state/tree/main/packages/semantic-state#readme",
+  "bugs": {
+    "url": "https://github.com/jasonli0226/semantic-state/issues"
+  },
   "type": "module",
   "sideEffects": false,
   "exports": {
-    ".": "./src/index.ts",
-    "./core": "./src/core/index.ts",
-    "./react": "./src/react/index.ts",
-    "./worker": "./src/worker/index.ts",
-    "./transformers": "./src/embedders/transformers.ts"
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./core": {
+      "source": "./src/core/index.ts",
+      "types": "./dist/core/index.d.ts",
+      "import": "./dist/core/index.js"
+    },
+    "./react": {
+      "source": "./src/react/index.ts",
+      "types": "./dist/react/index.d.ts",
+      "import": "./dist/react/index.js"
+    },
+    "./worker": {
+      "source": "./src/worker/index.ts",
+      "types": "./dist/worker/index.d.ts",
+      "import": "./dist/worker/index.js"
+    },
+    "./transformers": {
+      "source": "./src/embedders/transformers.ts",
+      "types": "./dist/embedders/transformers.d.ts",
+      "import": "./dist/embedders/transformers.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "!src/**/*.test.ts",
+    "!src/**/*.test.tsx",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "prepack": "npm run build"
+  },
+  "publishConfig": {
+    "access": "public",
+    "tag": "experimental"
   },
   "peerDependencies": {
     "@huggingface/transformers": ">=3",
     "react": ">=18"
   },
   "peerDependenciesMeta": {
-    "@huggingface/transformers": { "optional": true },
-    "react": { "optional": true }
+    "@huggingface/transformers": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    }
   }
 }

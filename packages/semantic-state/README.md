@@ -1,6 +1,6 @@
 # semantic-state
 
-> **Experimental (0.1.0-experimental).** Not on npm; APIs will change. Use it inside this repo's workspace.
+> **Experimental (0.1.0-experimental).** Published under the `experimental` npm tag only; APIs will change.
 
 React state that is **ranked by meaning instead of looked up by key**, computed on-device in a Web Worker.
 
@@ -13,6 +13,15 @@ React state that is **ranked by meaning instead of looked up by key**, computed 
 - Embeddings run in the worker with [transformers.js](https://huggingface.co/docs/transformers.js) (optional) or come
   precomputed from a file. Item text never leaves the device.
 - No Redux or other state manager needed. Keep exact state (forms, selection, carts) wherever you already keep it.
+
+## Install
+
+```bash
+npm install semantic-state@experimental react
+npm install @huggingface/transformers   # optional: on-device embeddings via transformersEmbedder
+```
+
+ESM only. Needs a bundler that handles `new Worker(new URL('./x.worker.ts', import.meta.url))` (Vite, webpack 5, …).
 
 ## Quick start
 

@@ -8,8 +8,8 @@
     "dev": "vite",
     "build": "tsc -p tsconfig.json && vite build",
     "preview": "vite preview",
-    "eval": "node scripts/eval.ts",
-    "pairs": "node scripts/pairs.ts"
+    "eval": "node --conditions=source scripts/eval.ts",
+    "pairs": "node --conditions=source scripts/pairs.ts"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.3.0",

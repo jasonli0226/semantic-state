@@ -1,7 +1,9 @@
 # semantic-state
 
-> **Experimental.** A research project: APIs change without notice, it is published only under the `experimental` npm
-> tag (`npm install semantic-state@experimental`), and the numbers come from small datasets. Not for production.
+[![npm](https://img.shields.io/npm/v/semantic-state/experimental?label=npm%40experimental)](https://www.npmjs.com/package/semantic-state) [![license](https://img.shields.io/npm/l/semantic-state)](LICENSE)
+
+> **Experimental.** A research project published as a prerelease (`0.1.0-experimental.0`): APIs change without notice,
+> and the numbers come from small datasets. Not for production.
 
 React state that is **ranked by meaning instead of looked up by key**, computed on-device in a Web Worker.
 
@@ -16,7 +18,15 @@ const { beliefs } = useSemantic<Note>('notes about the launch')
 - **On-device**: embeddings via transformers.js in a worker, or precomputed at build time. No server, no LLM, no API key.
 - **No second state manager**: keep exact state wherever you already do; this layer only ranks.
 
-→ Library docs and API: [`packages/semantic-state`](packages/semantic-state)
+## Install
+
+```bash
+npm install semantic-state@experimental react
+npm install @huggingface/transformers   # optional: on-device embeddings
+```
+
+Then write a worker file, create a store and use the hooks — see the
+[quick start and API](packages/semantic-state#quick-start).
 
 ## Examples
 
@@ -27,10 +37,15 @@ const { beliefs } = useSemantic<Note>('notes about the launch')
 
 ![Semantic Pokédex](docs/pokedex-search.png)
 
+## Roadmap
+
+What's next — CI, server-rendering support, persistence, larger collections — is in [ROADMAP.md](ROADMAP.md), with one
+issue per item.
+
 ## Repo layout
 
 ```
-packages/semantic-state/   the library (private workspace package)
+packages/semantic-state/   the library, published to npm as `semantic-state`
 examples/inbox/            dev-inbox demo + eval
 examples/pokedex/          Pokédex demo + data build + eval
 e2e/                       Playwright tests for both examples
@@ -49,6 +64,10 @@ npm run eval:pokedex
 ```
 
 The first page load downloads the embedding model (~23 MB) once; the browser caches it.
+
+**Releasing** (maintainers): bump `version` in `packages/semantic-state/package.json`, then
+`npm run publish:experimental` — it builds, packs and publishes with the `experimental` dist-tag (needs `npm login`
+with 2FA; run it in a normal terminal so npm can wait for the browser approval).
 
 ## Background
 

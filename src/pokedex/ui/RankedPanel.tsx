@@ -3,26 +3,26 @@ import { PendingBanner } from '../../ui/PendingBanner.tsx'
 import { useFlip } from '../../ui/useFlip.ts'
 import { formatMs } from '../../ui/useRowRenderer.tsx'
 import type { Pokemon } from '../types.ts'
-import type { PokemonBelief } from '../usePokedex.ts'
+import type { Belief, Id } from 'semantic-state'
 import { Sprite, TypeChips } from './bits.tsx'
 
 const VISIBLE = 15
 
-function reasonText(belief: PokemonBelief, query: string, byId: ReadonlyMap<number, Pokemon>): string {
+function reasonText(belief: Belief<Pokemon>, query: string, byId: ReadonlyMap<number, Pokemon>): string {
   if (belief.reason.kind === 'search') return `matches “${query}”`
-  const source = belief.reason.becauseOf === null ? undefined : byId.get(belief.reason.becauseOf)
+  const source = belief.reason.becauseOf === null ? undefined : byId.get(Number(belief.reason.becauseOf))
   return source ? `like ${source.name}` : 'like your clicks'
 }
 
 interface RankedPanelProps {
-  readonly beliefs: readonly PokemonBelief[]
+  readonly beliefs: readonly Belief<Pokemon>[]
   readonly query: string
   readonly byId: ReadonlyMap<number, Pokemon>
   readonly pending: { movedUp: number; added: number }
   readonly manual: boolean
   readonly onCommit: () => void
   readonly onPick: (id: number) => void
-  readonly onHover: (id: string | null) => void
+  readonly onHover: (id: Id | null) => void
   readonly panelProps: HTMLAttributes<HTMLElement>
   readonly stats: { rankMs: number | null; networkRequests: number | null; reorders: number }
 }
@@ -35,7 +35,7 @@ export function RankedPanel({ beliefs, query, byId, pending, manual, onCommit, o
   return (
     <section className="panel panel-semantic ranked" aria-label="Ranked for you" {...panelProps}>
       <header className="panel-head">
-        <p className="kicker">usePokedex() · no Redux</p>
+        <p className="kicker">useSemantic() · semantic-state · no Redux</p>
         <h2>Ranked for you</h2>
         <p className="panel-desc">Your search + what you clicked. One result per evolution family; each click gets a lane.</p>
         <dl className="stats">
@@ -65,7 +65,7 @@ export function RankedPanel({ beliefs, query, byId, pending, manual, onCommit, o
                 key={p.id}
                 data-id={p.id}
                 className={`row ${belief.confidence < 0.35 ? 'row-suggested' : ''}`}
-                onPointerEnter={() => onHover(String(p.id))}
+                onPointerEnter={() => onHover(p.id)}
                 onPointerLeave={() => onHover(null)}
               >
                 <button type="button" className="row-main ranked-row" onClick={() => onPick(p.id)}>
@@ -77,7 +77,7 @@ export function RankedPanel({ beliefs, query, byId, pending, manual, onCommit, o
                     </span>
                     <span className="row-meta">
                       <span className={`reason reason-${belief.reason.kind}`}>{reasonText(belief, query, byId)}</span>
-                      {belief.familyExtras > 0 && <span className="chip chip-dup">+{belief.familyExtras} in family</span>}
+                      {belief.groupExtras > 0 && <span className="chip chip-dup">+{belief.groupExtras} in family</span>}
                     </span>
                   </span>
                 </button>

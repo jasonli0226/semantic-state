@@ -1,12 +1,11 @@
 import { act, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { RankedItem } from '../core/types.ts'
 import { useCommitPolicy } from './useCommitPolicy.ts'
 
-const r = (id: string, score: number): RankedItem => ({ id, score, confidence: 1, source: 'semantic' })
+const r = (id: string, score: number) => ({ id, score })
 const first = [r('a', 0.9), r('b', 0.5)]
 const flipped = [r('a', 0.1), r('b', 0.9)]
-const ids = (rows: readonly RankedItem[]) => rows.map((row) => row.id)
+const ids = (rows: readonly { id: string }[]) => rows.map((row) => row.id)
 
 function setup(policy: 'onIdle' | 'manual' | 'live') {
   return renderHook(({ ranked }) => useCommitPolicy(ranked, { policy, hysteresis: 0.05, idleMs: 1000 }), {

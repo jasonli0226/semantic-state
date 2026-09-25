@@ -1,3 +1,5 @@
+import type { Vec } from 'semantic-state/core'
+
 export type Source = 'github' | 'ci' | 'slack' | 'calendar' | 'email' | 'jira'
 
 export type Phase = 'payments' | 'hiring'
@@ -22,14 +24,6 @@ export interface RankedItem {
   readonly source: RankSource
 }
 
-/** AI-derived state is never binary: every value carries how sure we are and where it came from. */
-export interface Belief<T> {
-  readonly value: T
-  readonly confidence: number
-  readonly source: RankSource
-  readonly updatedAt: number
-}
-
-export type Vec = Float32Array
+export type { Vec }
 
 export type VectorLookup = (id: string) => Vec | undefined

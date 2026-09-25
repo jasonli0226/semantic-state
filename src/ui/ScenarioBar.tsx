@@ -1,12 +1,10 @@
 import { useState } from 'react'
-import { useSelector } from 'react-redux'
 import { SCENARIO } from '../app/scenario.ts'
-import { selectPhase } from '../app/store.ts'
-import { useInboxActions } from './actionsContext.ts'
+import { useInboxActions, useInboxState } from './actionsContext.ts'
 
 export function ScenarioBar({ disabled }: { disabled: boolean }) {
   const actions = useInboxActions()
-  const phase = useSelector(selectPhase)
+  const { phase } = useInboxState()
   const [activeId, setActiveId] = useState(SCENARIO[0].id)
   const [running, setRunning] = useState(false)
   const active = SCENARIO.find((step) => step.id === activeId) ?? SCENARIO[0]

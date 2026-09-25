@@ -1,4 +1,4 @@
-import type { RankedItem } from './types.ts'
+import type { Rankable } from './types.ts'
 
 /** The order the user actually sees, plus the score each item was placed with. */
 export interface Committed {
@@ -15,7 +15,7 @@ export interface CommitOptions {
   readonly pinned: ReadonlySet<string>
 }
 
-export function planCommit(prev: Committed, next: readonly RankedItem[], opts: CommitOptions): Committed {
+export function planCommit(prev: Committed, next: readonly Rankable[], opts: CommitOptions): Committed {
   const prevIndex = new Map(prev.order.map((id, i) => [id, i]))
   const sticky = new Map(
     next.map((r) => {

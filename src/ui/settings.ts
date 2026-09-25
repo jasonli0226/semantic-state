@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react'
-import type { CommitPolicy } from '../semantic/config.ts'
+import type { CommitPolicy } from 'semantic-state'
 
 export interface Settings {
   readonly policy: CommitPolicy

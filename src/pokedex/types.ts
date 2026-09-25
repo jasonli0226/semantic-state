@@ -25,11 +25,14 @@ export interface Pokemon {
   readonly flavor: string
 }
 
-/** Relative weight of each similarity signal. Exposed as sliders in the UI. */
-export interface SimilarityWeights {
+/** Relative weight of each similarity signal (feature names in semantic-state). Exposed as sliders. */
+export type SimilarityWeights = {
   readonly text: number
   readonly type: number
   readonly stats: number
 }
 
 export const DEFAULT_WEIGHTS: SimilarityWeights = { text: 1, type: 1, stats: 0.5 }
+
+/** Search results per query sent from the worker. */
+export const RESULT_LIMIT = 40

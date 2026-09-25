@@ -1,6 +1,6 @@
 /** Prints the most similar item pairs — used to pick the duplicate threshold. */
 import { pipeline } from '@huggingface/transformers'
-import { dot } from '../src/core/vector.ts'
+import { dot } from 'semantic-state/core'
 import { embeddingText, initialItems, ARRIVALS } from '../src/data/dataset.ts'
 import { EMBEDDING_MODEL } from '../src/semantic/config.ts'
 

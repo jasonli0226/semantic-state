@@ -1,19 +1,34 @@
+import { createSemanticStore } from 'semantic-state'
+import { SemanticProvider } from 'semantic-state/react'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import '../index.css'
-import './pokedex.css'
 import PokedexApp from './PokedexApp.tsx'
-import { PokedexEngineContext } from './context.ts'
-import { createPokedexEngine } from './engine.ts'
+import { parsePokedex } from './data.ts'
+import './pokedex.css'
+import type { Pokemon } from './types.ts'
 
-const worker = new Worker(new URL('./pokedex.worker.ts', import.meta.url), { type: 'module' })
-const engine = createPokedexEngine(worker)
-engine.start()
+const semantic = createSemanticStore<Pokemon>(new Worker(new URL('./pokedex.worker.ts', import.meta.url), { type: 'module' }))
+const root = createRoot(document.getElementById('root')!)
+root.render(<p className="empty">Loading Pokédex…</p>)
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <PokedexEngineContext.Provider value={engine}>
-      <PokedexApp />
-    </PokedexEngineContext.Provider>
-  </StrictMode>,
-)
+async function load(): Promise<Pokemon[]> {
+  const response = await fetch(`${import.meta.env.BASE_URL}pokedex/pokedex.json`)
+  if (!response.ok) throw new Error(`HTTP ${response.status}`)
+  return parsePokedex(await response.json())
+}
+
+load()
+  .then((pokedex) => {
+    semantic.upsert(pokedex)
+    root.render(
+      <StrictMode>
+        <SemanticProvider store={semantic}>
+          <PokedexApp pokedex={pokedex} />
+        </SemanticProvider>
+      </StrictMode>,
+    )
+  })
+  .catch((error: unknown) => {
+    root.render(<p className="banner banner-error">Could not load the Pokédex: {error instanceof Error ? error.message : String(error)}</p>)
+  })

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { makeSynthetic } from './synthetic.ts'
 import type { Item, Vec } from './types.ts'
-import { dot } from './vector.ts'
+import { dot } from 'semantic-state/core'
 
 const HOUR = 3_600_000
 const NOW = 1_000 * HOUR

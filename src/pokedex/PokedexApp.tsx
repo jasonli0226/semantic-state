@@ -1,34 +1,38 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { CommitPolicy } from '../semantic/config.ts'
-import { usePokedex } from './usePokedex.ts'
+import type { CommitPolicy } from 'semantic-state'
+import { useSemantic, useSemanticSnapshot, useSemanticStore, useSimilar } from 'semantic-state/react'
+import { useCallback, useMemo, useState } from 'react'
+import { DEFAULT_WEIGHTS, type Pokemon, type SimilarityWeights } from './types.ts'
 import { DetailCard } from './ui/DetailCard.tsx'
 import { DexGrid } from './ui/DexGrid.tsx'
 import { InterestChips } from './ui/InterestChips.tsx'
 import { RankedPanel } from './ui/RankedPanel.tsx'
 import { SearchBar } from './ui/SearchBar.tsx'
 
-export default function PokedexApp() {
+const SIMILAR_COUNT = 6
+
+/** No Redux, no second store: the dex is static data, everything semantic comes from semantic-state. */
+export default function PokedexApp({ pokedex }: { pokedex: readonly Pokemon[] }) {
   const [policy, setPolicy] = useState<CommitPolicy>('onIdle')
+  const [query, setQuery] = useState('')
   const [selectedId, setSelectedId] = useState<number | null>(null)
-  const dex = usePokedex(policy)
-  const { click, requestSimilar, weights } = dex
+
+  const store = useSemanticStore<Pokemon>()
+  const snapshot = useSemanticSnapshot<Pokemon>()
+  const semantic = useSemantic<Pokemon>(query, { commit: policy })
+  const similar = useSimilar<Pokemon>(selectedId, SIMILAR_COUNT)
+
+  const byId = useMemo(() => new Map(pokedex.map((p) => [p.id, p])), [pokedex])
+  const weights: SimilarityWeights = { ...DEFAULT_WEIGHTS, ...snapshot.weights }
+  const interestWeights = useMemo(() => new Map(semantic.interests.map((i) => [Number(i.id), i.weight])), [semantic.interests])
 
   const pick = useCallback(
     (id: number) => {
-      click(id)
+      store.interact(id)
       setSelectedId(id)
     },
-    [click],
+    [store],
   )
-
-  // "Similar to X" follows the selection and the weight sliders.
-  useEffect(() => {
-    if (selectedId !== null && dex.status === 'ready') requestSimilar(selectedId)
-  }, [selectedId, weights, dex.status, requestSimilar])
-
-  const interestWeights = useMemo(() => new Map(dex.interests.map((i) => [i.pokemon.id, i.weight])), [dex.interests])
-  const selected = selectedId === null ? undefined : dex.byId.get(selectedId)
-  const similar = dex.similar && dex.similar.id === selectedId ? dex.similar.results : null
+  const selected = selectedId === null ? undefined : byId.get(selectedId)
 
   return (
     <>
@@ -54,32 +58,29 @@ export default function PokedexApp() {
         </fieldset>
       </header>
 
-      {dex.status === 'error' && <p className="banner banner-error">Could not load the Pokédex: {dex.error}</p>}
+      {snapshot.status === 'error' && <p className="banner banner-error">Semantic layer unavailable: {snapshot.error}</p>}
 
-      <SearchBar onSearch={dex.search} model={dex.model} weights={dex.weights} onWeights={dex.setWeights} />
-      <InterestChips interests={dex.interests} onForget={dex.forget} onClear={dex.clear} />
+      <SearchBar onSearch={setQuery} model={snapshot.model} weights={weights} onWeights={store.setWeights} />
+      <InterestChips interests={semantic.interests} onForget={store.forget} onClear={store.clearInterests} />
 
       <div className="dex-layout">
         <main>
-          {dex.status !== 'ready' ? <p className="empty">Loading Pokédex…</p> : null}
-          <DexGrid pokedex={dex.pokedex} interestWeights={interestWeights} selectedId={selectedId} onPick={pick} />
+          <DexGrid pokedex={pokedex} interestWeights={interestWeights} selectedId={selectedId} onPick={pick} />
         </main>
         <aside className="sidebar">
           <RankedPanel
-            beliefs={dex.beliefs}
-            query={dex.query}
-            byId={dex.byId}
-            pending={dex.pending}
+            beliefs={semantic.beliefs}
+            query={semantic.resultQuery ?? ''}
+            byId={byId}
+            pending={semantic.pending}
             manual={policy === 'manual'}
-            onCommit={dex.commit}
+            onCommit={semantic.commit}
             onPick={pick}
-            onHover={dex.pin}
-            panelProps={dex.panelProps}
-            stats={{ rankMs: dex.rankMs, networkRequests: dex.networkRequests, reorders: dex.reordersDuringInteraction }}
+            onHover={semantic.pin}
+            panelProps={semantic.panelProps}
+            stats={{ rankMs: semantic.rankMs, networkRequests: semantic.networkRequests, reorders: semantic.reordersDuringInteraction }}
           />
-          {selected && (
-            <DetailCard pokemon={selected} similar={similar} byId={dex.byId} onPick={pick} onClose={() => setSelectedId(null)} />
-          )}
+          {selected && <DetailCard pokemon={selected} similar={similar} onPick={pick} onClose={() => setSelectedId(null)} />}
         </aside>
       </div>
       <p className="footnote">

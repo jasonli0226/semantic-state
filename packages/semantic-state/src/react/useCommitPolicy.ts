@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { type Committed, EMPTY_COMMITTED, type Moves, countMoves, planCommit } from '../core/commit.ts'
-import type { RankedItem } from '../core/types.ts'
-import type { CommitPolicy } from './config.ts'
+import type { CommitPolicy, Rankable } from '../core/types.ts'
 import { useActivity, useReorderCount } from './useActivity.ts'
 
 export interface CommitPolicyOptions {
@@ -17,7 +16,7 @@ const sameOrder = (a: readonly string[], b: readonly string[]) => a.length === b
  * Separates the ranking the engine computed (always fresh) from the order the user sees.
  * The visible order only changes when the commit policy says it is safe.
  */
-export function useCommitPolicy(ranked: readonly RankedItem[], { policy, hysteresis, idleMs }: CommitPolicyOptions) {
+export function useCommitPolicy<R extends Rankable>(ranked: readonly R[], { policy, hysteresis, idleMs }: CommitPolicyOptions) {
   const [committed, setCommitted] = useState<Committed>(() => planCommit(EMPTY_COMMITTED, ranked, { hysteresis, pinned: NO_PIN }))
   const [pinnedId, setPinnedId] = useState<string | null>(null)
   const [recheck, setRecheck] = useState(0)

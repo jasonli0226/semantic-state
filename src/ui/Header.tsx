@@ -1,7 +1,6 @@
-import { useSelector } from 'react-redux'
-import { selectActiveItems } from '../app/store.ts'
-import type { CommitPolicy } from '../semantic/config.ts'
-import { useInboxActions } from './actionsContext.ts'
+import { activeItems } from '../app/inboxStore.ts'
+import type { CommitPolicy } from 'semantic-state'
+import { useInboxActions, useInboxState } from './actionsContext.ts'
 import { useLongTasks } from './useLongTasks.ts'
 
 const POLICIES: readonly { value: CommitPolicy; label: string; hint: string }[] = [
@@ -22,7 +21,7 @@ interface HeaderProps {
 
 export function Header({ policy, onPolicy, showAnswerKey, onShowAnswerKey, engineReady }: HeaderProps) {
   const actions = useInboxActions()
-  const itemCount = useSelector(selectActiveItems).length
+  const itemCount = activeItems(useInboxState()).length
   const longTasks = useLongTasks()
 
   return (
@@ -32,7 +31,7 @@ export function Header({ policy, onPolicy, showAnswerKey, onShowAnswerKey, engin
           <a href="./pokedex.html">Pokédex demo →</a>
         </p>
         <h1>Semantic state</h1>
-        <p>Dev inbox, Monday morning — rules vs a semantic layer vs the same idea as a Redux selector. Everything runs on this device.</p>
+        <p>Dev inbox, Monday morning — hand-written rules vs a semantic layer (semantic-state). Everything runs on this device.</p>
       </div>
       <div className="controls">
         <fieldset className="segmented">

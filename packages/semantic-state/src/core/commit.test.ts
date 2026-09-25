@@ -1,8 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { EMPTY_COMMITTED, countMoves, planCommit } from './commit.ts'
-import type { RankedItem } from './types.ts'
 
-const r = (id: string, score: number): RankedItem => ({ id, score, confidence: 1, source: 'semantic' })
+const r = (id: string, score: number) => ({ id, score })
 const opts = { hysteresis: 0.1, pinned: new Set<string>() }
 
 describe('planCommit', () => {

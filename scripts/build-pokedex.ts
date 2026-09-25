@@ -102,5 +102,5 @@ chunks.reduce((offset, chunk) => (vectors.set(chunk, offset), offset + chunk.len
 await mkdir(OUT_DIR, { recursive: true })
 await writeFile(`${OUT_DIR}/pokedex.json`, JSON.stringify(pokedex))
 await writeFile(`${OUT_DIR}/vectors.bin`, new Uint8Array(vectors.buffer))
-await writeFile(`${OUT_DIR}/meta.json`, `${JSON.stringify({ model: EMBEDDING_MODEL, dtype: 'q8', dims, count: pokedex.length, source: 'PokeAPI CSV (github.com/PokeAPI/pokeapi)' }, null, 2)}\n`)
+await writeFile(`${OUT_DIR}/meta.json`, `${JSON.stringify({ model: EMBEDDING_MODEL, dtype: 'q8', dims, count: pokedex.length, source: 'PokeAPI CSV (github.com/PokeAPI/pokeapi)', ids: pokedex.map((p) => p.id) })}\n`)
 process.stdout.write(`${pokedex.length} Pokémon · ${dims} dims · vectors ${(vectors.byteLength / 1e6).toFixed(1)} MB\n`)

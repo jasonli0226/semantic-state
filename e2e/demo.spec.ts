@@ -62,19 +62,16 @@ test('manual commit policy holds the order until Refresh', async ({ page }) => {
   await expect(stat(semantic, 'precision@5')).toHaveText('5/5')
 })
 
-test('scale test: 10k items rank in the worker; the Redux baseline ranks on the main thread', async ({ page }) => {
+test('scale test: 10k items are ranked in the worker, the page stays responsive', async ({ page }) => {
   await ready(page)
   await page.getByRole('button', { name: '+10,000' }).click()
   const semantic = panel(page, SEMANTIC)
-  const baseline = panel(page, 'createSelector baseline')
   await expect(page.getByText(/Scale test · 10,0\d\d items/)).toBeVisible({ timeout: 30_000 })
   await runStep(page, '2. Work on payments')
   // Precision is not asserted here: synthetic items are near-paraphrases of real ones and crowd the top.
   await expect(stat(semantic, 'rank (worker)')).toHaveText(/ms$/)
   const workerMs = await stat(semantic, 'rank (worker)').textContent()
-  const mainMs = await stat(baseline, 'rank (main thread)').textContent()
-  const precision = `semantic ${await stat(semantic, 'precision@5').textContent()} · baseline ${await stat(baseline, 'precision@5').textContent()}`
-  test.info().annotations.push({ type: 'rank at 10k', description: `worker ${workerMs} · redux selector ${mainMs} · ${precision}` })
+  test.info().annotations.push({ type: 'rank at 10k', description: `worker ${workerMs} · precision ${await stat(semantic, 'precision@5').textContent()}` })
   await page.waitForTimeout(500) // let the FLIP animation settle
   await page.screenshot({ path: 'docs/demo-10k.png' })
 })

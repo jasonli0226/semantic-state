@@ -6,15 +6,13 @@
  */
 import { pipeline } from '@huggingface/transformers'
 import { SCENARIO } from '../src/app/scenario.ts'
-import { EMPTY_CENTROID, observe, type Centroid } from '../src/core/centroid.ts'
-import { collapseDuplicates, groupDuplicates } from '../src/core/dedupe.ts'
+import { type Centroid, EMPTY_CENTROID, collapseDuplicates, dot, groupDuplicates, observe } from 'semantic-state/core'
 import { precisionAtK } from '../src/core/metrics.ts'
 import { rankItems } from '../src/core/rank.ts'
 import { rankByRules } from '../src/core/rules.ts'
 import type { Item, Phase, Vec } from '../src/core/types.ts'
-import { dot } from '../src/core/vector.ts'
 import { DEMO_NOW, embeddingText, groundTruth, initialItems } from '../src/data/dataset.ts'
-import { ATTENTION_QUERY, EMBEDDING_MODEL } from '../src/semantic/config.ts'
+import { ATTENTION_QUERY, EMBEDDING_MODEL, INBOX_DUPLICATE_THRESHOLD, INBOX_INTERESTS } from '../src/semantic/config.ts'
 
 const showTop = process.argv.includes('--top')
 const extractor = await pipeline('feature-extraction', EMBEDDING_MODEL, { dtype: 'q8' })
@@ -50,7 +48,7 @@ for (const step of SCENARIO) {
       seen = new Set()
       phase = 'payments'
     } else if (action.kind === 'open') {
-      centroid = observe(centroid, vectors.get(action.id)!)
+      centroid = observe(centroid, vectors.get(action.id)!, 1, INBOX_INTERESTS.decay)
       seen = new Set([...seen, action.id])
     } else if (action.kind === 'arrive') {
       await addItems([action.item])
@@ -63,7 +61,7 @@ for (const step of SCENARIO) {
   const rules = rankByRules(items, DEMO_NOW).map((r) => r.id)
   const ranked = rankItems(items, { getVector: (id) => vectors.get(id), queryVec, centroid, now: DEMO_NOW, seen })
   const order = ranked.map((r) => r.id)
-  const semantic = collapseDuplicates(order, groupDuplicates(order, (id) => vectors.get(id)))
+  const semantic = collapseDuplicates(order, groupDuplicates(order, (id) => vectors.get(id), INBOX_DUPLICATE_THRESHOLD))
   const truth = groundTruth[phase]
 
   rows.push(

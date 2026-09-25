@@ -1,5 +1,5 @@
 import { STAT_KEYS, type Pokemon } from '../types.ts'
-import type { RankedPokemon } from '../rank.ts'
+import type { ResultRow } from 'semantic-state'
 import { Sprite, TypeChips } from './bits.tsx'
 import { artworkUrl, dexNumber } from './sprites.ts'
 
@@ -8,13 +8,12 @@ const STAT_MAX = 255
 
 interface DetailCardProps {
   readonly pokemon: Pokemon
-  readonly similar: readonly RankedPokemon[] | null
-  readonly byId: ReadonlyMap<number, Pokemon>
+  readonly similar: readonly ResultRow<Pokemon>[] | null
   readonly onPick: (id: number) => void
   readonly onClose: () => void
 }
 
-export function DetailCard({ pokemon, similar, byId, onPick, onClose }: DetailCardProps) {
+export function DetailCard({ pokemon, similar, onPick, onClose }: DetailCardProps) {
   return (
     <section className="detail" aria-label={`${pokemon.name} details`}>
       <button type="button" className="detail-close" onClick={onClose} aria-label="Close details">
@@ -45,11 +44,10 @@ export function DetailCard({ pokemon, similar, byId, onPick, onClose }: DetailCa
       <p className="hint">Nearest neighbours outside its evolution family, using the weights above.</p>
       <ul className="similar">
         {(similar ?? []).map((r) => {
-          const other = byId.get(r.id)
-          if (!other) return null
+          const other = r.item
           return (
-            <li key={r.id}>
-              <button type="button" onClick={() => onPick(r.id)} title={`${other.name} — similarity ${r.score.toFixed(2)}`}>
+            <li key={other.id}>
+              <button type="button" onClick={() => onPick(other.id)} title={`${other.name} — similarity ${r.score.toFixed(2)}`}>
                 <Sprite pokemon={other} size={56} />
                 <span>{other.name}</span>
               </button>

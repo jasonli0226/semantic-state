@@ -1,6 +1,6 @@
 import { HOUR } from './time.ts'
 import type { Item, Vec } from './types.ts'
-import { addScaled, dot, normalize } from './vector.ts'
+import { addScaled, dot, normalize } from 'semantic-state/core'
 
 /**
  * Filler items for the 1k / 10k scale test. Each one is a real item's embedding pushed in a random

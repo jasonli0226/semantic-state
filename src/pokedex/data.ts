@@ -1,5 +1,4 @@
 import { z } from 'zod'
-import type { Vec } from '../core/types.ts'
 import { POKEMON_TYPES, type Pokemon, STAT_KEYS } from './types.ts'
 
 const stat = z.number().int().min(1).max(255)
@@ -32,16 +31,6 @@ export function parsePokedex(input: unknown): Pokemon[] {
     ids.add(id)
   }
   return result.data
-}
-
-/** vectors.bin: `count` Float32 vectors of `dims` values, in pokedex.json order. */
-export function decodeVectors(buffer: ArrayBuffer, count: number, dims: number): Vec[] {
-  const expected = count * dims * Float32Array.BYTES_PER_ELEMENT
-  if (buffer.byteLength !== expected) {
-    throw new Error(`Invalid vectors.bin: expected ${expected} bytes, got ${buffer.byteLength}`)
-  }
-  const all = new Float32Array(buffer)
-  return Array.from({ length: count }, (_, i) => all.slice(i * dims, (i + 1) * dims))
 }
 
 const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)

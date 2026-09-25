@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { decodeVectors, embeddingTextFor, parsePokedex } from './data.ts'
+import { embeddingTextFor, parsePokedex } from './data.ts'
 import type { Pokemon } from './types.ts'
 
 const pikachu = {
@@ -33,18 +33,6 @@ describe('parsePokedex', () => {
   it('rejects entries with no types or more than two', () => {
     expect(() => parsePokedex([{ ...pikachu, types: [] }])).toThrow()
     expect(() => parsePokedex([{ ...pikachu, types: ['fire', 'water', 'grass'] }])).toThrow()
-  })
-})
-
-describe('decodeVectors', () => {
-  it('splits a Float32 buffer into per-entry vectors', () => {
-    const buffer = new Float32Array([1, 2, 3, 4, 5, 6]).buffer
-    const vectors = decodeVectors(buffer, 2, 3)
-    expect(Array.from(vectors[1])).toEqual([4, 5, 6])
-  })
-
-  it('rejects a buffer whose size does not match', () => {
-    expect(() => decodeVectors(new Float32Array(5).buffer, 2, 3)).toThrow(/expected 24 bytes, got 20/)
   })
 })
 

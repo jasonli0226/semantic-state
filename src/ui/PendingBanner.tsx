@@ -1,4 +1,4 @@
-import type { Moves } from '../core/commit.ts'
+import type { Moves } from 'semantic-state/core'
 
 /** "3 moved up · 1 new" — the ranking changed but the visible order is being held. */
 export function PendingBanner({ pending, manual, onCommit }: { pending: Moves; manual: boolean; onCommit: () => void }) {

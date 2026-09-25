@@ -1,7 +1,13 @@
-import { type Centroid, centroidVector } from './centroid.ts'
+import { type Centroid, type Scorer, scoreAll } from 'semantic-state/core'
+import { INBOX_INTERESTS } from '../semantic/config.ts'
 import { recency, urgency } from './time.ts'
 import type { RankedItem, Vec, VectorLookup } from './types.ts'
-import { dot } from './vector.ts'
+
+/**
+ * The inbox's scorer: deadlines and freshness always count, the attention centroid counts more as
+ * interaction history builds up, and items already opened are pushed down.
+ * The worker (via defineSemanticWorker) and the Redux baseline both use it.
+ */
 
 export interface RankWeights {
   readonly query: number
@@ -27,6 +33,23 @@ export interface Rankable {
   readonly createdAt: number
 }
 
+const clamp01 = (x: number) => Math.min(1, Math.max(0, x))
+
+export function inboxScorer(now: number, w: RankWeights = DEFAULT_WEIGHTS): Scorer<Rankable> {
+  return ({ item, querySim, interest, history, interacted, hasVector }) => {
+    const base = w.urgency * urgency(item.dueAt, now) + w.recency * recency(item.createdAt, now) - (interacted ? w.seen : 0)
+    if (!hasVector) return { score: base, confidence: 0, reason: { kind: 'fallback', becauseOf: null } }
+    const fromQuery = w.query * (querySim ?? 0)
+    if (!interest) return { score: base + fromQuery, confidence: FALLBACK_CONFIDENCE, reason: { kind: 'fallback', becauseOf: null } }
+    const trust = clamp01(history / HISTORY_SATURATION)
+    return {
+      score: base + fromQuery + w.centroid * trust * interest.score,
+      confidence: trust * clamp01((interest.score - CONFIDENCE_SIM_LOW) / CONFIDENCE_SIM_SPAN),
+      reason: { kind: 'interest', becauseOf: null },
+    }
+  }
+}
+
 export interface RankContext {
   readonly getVector: VectorLookup
   readonly queryVec: Vec | null
@@ -36,31 +59,20 @@ export interface RankContext {
   readonly weights?: RankWeights
 }
 
-const clamp01 = (x: number) => Math.min(1, Math.max(0, x))
-
+/** Synchronous ranking for the Redux baseline and the headless eval: same scorer as the worker. */
 export function rankItems(items: readonly Rankable[], ctx: RankContext): RankedItem[] {
-  const w = ctx.weights ?? DEFAULT_WEIGHTS
-  const attention = centroidVector(ctx.centroid)
-  const history = clamp01(ctx.centroid.weight / HISTORY_SATURATION)
-
-  const ranked = items.map((item): RankedItem => {
-    const penalty = ctx.seen?.has(item.id) ? w.seen : 0
-    const base = w.urgency * urgency(item.dueAt, ctx.now) + w.recency * recency(item.createdAt, ctx.now) - penalty
-    const vec = ctx.getVector(item.id)
-    if (!vec) return { id: item.id, score: base, confidence: 0, source: 'fallback' }
-
-    const querySim = ctx.queryVec ? dot(vec, ctx.queryVec) : 0
-    if (!attention) {
-      return { id: item.id, score: base + w.query * querySim, confidence: FALLBACK_CONFIDENCE, source: 'fallback' }
-    }
-    const sim = dot(vec, attention)
-    return {
-      id: item.id,
-      score: base + w.query * querySim + w.centroid * history * sim,
-      confidence: history * clamp01((sim - CONFIDENCE_SIM_LOW) / CONFIDENCE_SIM_SPAN),
-      source: 'semantic',
-    }
+  const scored = scoreAll({
+    items,
+    idOf: (item) => item.id,
+    features: (id) => {
+      const text = ctx.getVector(String(id))
+      return text ? { text } : undefined
+    },
+    queryVec: ctx.queryVec,
+    attention: { centroid: ctx.centroid, interests: [], interacted: ctx.seen ?? new Set() },
+    interests: INBOX_INTERESTS,
+    weights: { text: 1 },
+    scorer: inboxScorer(ctx.now, ctx.weights),
   })
-
-  return ranked.sort((a, b) => b.score - a.score)
+  return scored.map((s) => ({ id: String(s.id), score: s.score, confidence: s.confidence, source: s.reason.kind === 'interest' ? 'semantic' : 'fallback' }))
 }

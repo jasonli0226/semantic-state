@@ -1,12 +1,22 @@
 import { useMemo } from 'react'
-import { useSelector } from 'react-redux'
-import { selectRulesRanking } from '../app/store.ts'
+import { type InboxState, activeItems } from '../app/inboxStore.ts'
+import { rankByRules } from '../core/rules.ts'
+import { DEMO_NOW } from '../data/dataset.ts'
 import { VISIBLE_ROWS } from '../semantic/config.ts'
+import { useInboxState } from './actionsContext.ts'
 import { Panel } from './Panel.tsx'
 import { formatMs, formatPrecision, usePrecisionAt5, useRowRenderer } from './useRowRenderer.tsx'
 
+/** Hand-written ranking, timed so the panel can show its cost next to the worker's. */
+function timedRulesRanking(state: InboxState) {
+  const started = performance.now()
+  const ranked = rankByRules(activeItems(state), DEMO_NOW)
+  return { ranked, rankMs: performance.now() - started }
+}
+
 export function RulesPanel() {
-  const { ranked, rankMs } = useSelector(selectRulesRanking)
+  const state = useInboxState()
+  const { ranked, rankMs } = useMemo(() => timedRulesRanking(state), [state])
   const ids = useMemo(() => ranked.slice(0, VISIBLE_ROWS).map((r) => r.id), [ranked])
   const precision = usePrecisionAt5(ids)
   const renderRow = useRowRenderer()

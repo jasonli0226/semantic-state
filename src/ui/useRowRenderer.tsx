@@ -1,9 +1,7 @@
 import { useCallback, useMemo } from 'react'
-import { useSelector } from 'react-redux'
-import { selectItemsById, selectPhase, selectSeen } from '../app/store.ts'
 import { precisionAtK } from '../core/metrics.ts'
 import { groundTruth } from '../data/dataset.ts'
-import { useInboxActions } from './actionsContext.ts'
+import { useInboxActions, useInboxState } from './actionsContext.ts'
 import { ItemRow, type RowBelief } from './ItemRow.tsx'
 import { useSettings } from './settings.ts'
 
@@ -13,11 +11,12 @@ interface RowOptions {
   readonly onHover?: (id: string | null) => void
 }
 
-/** Shared row rendering: item data comes from the traditional store, ranking from whichever panel. */
+/** Shared row rendering: item data and seen state come from the inbox store, ranking from whichever panel. */
 export function useRowRenderer({ beliefs, duplicatesOf, onHover }: RowOptions = {}) {
-  const items = useSelector(selectItemsById)
-  const seen = useSelector(selectSeen)
-  const phase = useSelector(selectPhase)
+  const state = useInboxState()
+  const items = useMemo(() => new Map(state.items.map((item) => [item.id, item])), [state.items])
+  const seen = useMemo(() => new Set(state.seen), [state.seen])
+  const { phase } = state
   const actions = useInboxActions()
   const { showAnswerKey } = useSettings()
 
@@ -45,7 +44,7 @@ export function useRowRenderer({ beliefs, duplicatesOf, onHover }: RowOptions = 
 
 /** Precision@5 of a panel's visible order against the current phase's answer key. */
 export function usePrecisionAt5(ids: readonly string[]): number {
-  const phase = useSelector(selectPhase)
+  const { phase } = useInboxState()
   return useMemo(() => precisionAtK(ids, groundTruth[phase], 5), [ids, phase])
 }
 

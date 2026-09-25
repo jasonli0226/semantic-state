@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { MAX_QUERY_LENGTH, type PokedexSnapshot } from '../engine.ts'
+import { MAX_QUERY_LENGTH, type ModelState } from 'semantic-state'
 import type { SimilarityWeights } from '../types.ts'
 
 const DEBOUNCE_MS = 250
@@ -10,7 +10,7 @@ const WEIGHT_LABELS: readonly { key: keyof SimilarityWeights; label: string; hin
   { key: 'stats', label: 'Stats', hint: 'Shape of the base-stat spread (fast glass cannon vs tank)' },
 ]
 
-function ModelStatus({ model }: { model: PokedexSnapshot['model'] }) {
+function ModelStatus({ model }: { model: ModelState }) {
   switch (model.status) {
     case 'idle':
       return <>Clicks work now. The search model (~23 MB) downloads on your first search, once.</>
@@ -29,7 +29,7 @@ function ModelStatus({ model }: { model: PokedexSnapshot['model'] }) {
 
 interface SearchBarProps {
   readonly onSearch: (text: string) => void
-  readonly model: PokedexSnapshot['model']
+  readonly model: ModelState
   readonly weights: SimilarityWeights
   readonly onWeights: (weights: SimilarityWeights) => void
 }

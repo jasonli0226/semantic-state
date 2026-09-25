@@ -8,11 +8,11 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
-    include: ['src/**/*.test.{ts,tsx}'],
+    include: ['src/**/*.test.{ts,tsx}', 'packages/*/src/**/*.test.{ts,tsx}'],
     coverage: {
       provider: 'v8',
-      include: ['src/core/**', 'src/semantic/engine.ts', 'src/semantic/useCommitPolicy.ts', 'src/semantic/useActivity.ts', 'src/app/**', 'src/pokedex/{data,features,rank,engine}.ts'],
-      exclude: ['**/*.test.*'],
+      include: ['packages/semantic-state/src/**', 'src/core/**', 'src/app/**', 'src/pokedex/{data,features}.ts'],
+      exclude: ['**/*.test.*', '**/index.ts', 'packages/semantic-state/src/embedders/**'],
     },
   },
 })

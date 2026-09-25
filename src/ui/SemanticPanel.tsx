@@ -1,34 +1,41 @@
+import type { ModelState } from 'semantic-state'
+import { useSemantic } from 'semantic-state/react'
 import { useMemo } from 'react'
+import type { Item } from '../core/types.ts'
 import { ATTENTION_QUERY, VISIBLE_ROWS } from '../semantic/config.ts'
-import { useSemantic } from '../semantic/useSemantic.ts'
 import { Panel } from './Panel.tsx'
 import { PendingBanner } from './PendingBanner.tsx'
 import { useSettings } from './settings.ts'
 import { formatMs, formatPrecision, usePrecisionAt5, useRowRenderer } from './useRowRenderer.tsx'
 
-function ModelBanner({ status, progress, error }: { status: string; progress: number; error: string | null }) {
-  if (status === 'error') return <div className="banner banner-error">Semantic layer unavailable: {error}</div>
-  if (status === 'ready') return null
+function ModelBanner({ model }: { model: ModelState }) {
+  if (model.status === 'error') return <div className="banner banner-error">Semantic layer unavailable: {model.error}</div>
+  if (model.status === 'ready') return null
   return (
     <div className="banner" role="status">
-      <span>Loading embedding model on this device (once, then cached) — {Math.round(progress * 100)}%</span>
-      <progress max={1} value={progress} />
+      <span>Loading embedding model on this device (once, then cached) — {Math.round(model.progress * 100)}%</span>
+      <progress max={1} value={model.progress} />
     </div>
   )
 }
 
 export function SemanticPanel() {
   const { policy } = useSettings()
-  const semantic = useSemantic(ATTENTION_QUERY, { policy })
-  const ids = useMemo(() => semantic.beliefs.slice(0, VISIBLE_ROWS).map((b) => b.value), [semantic.beliefs])
-  const beliefs = useMemo(() => new Map(semantic.beliefs.map((b) => [b.value, b])), [semantic.beliefs])
+  const semantic = useSemantic<Item>(ATTENTION_QUERY, { commit: policy })
+  const ids = useMemo(() => semantic.beliefs.slice(0, VISIBLE_ROWS).map((b) => b.value.id), [semantic.beliefs])
+  const beliefs = useMemo(
+    () => new Map(semantic.beliefs.map((b) => [b.value.id, { confidence: b.confidence, source: b.reason.kind === 'interest' ? 'semantic' : b.reason.kind }])),
+    [semantic.beliefs],
+  )
+  const duplicatesOf = useMemo(() => new Map(semantic.beliefs.map((b) => [b.value.id, b.groupExtras])), [semantic.beliefs])
   const precision = usePrecisionAt5(ids)
-  const renderRow = useRowRenderer({ beliefs, duplicatesOf: semantic.duplicatesOf, onHover: semantic.pin })
+  const { pin } = semantic
+  const renderRow = useRowRenderer({ beliefs, duplicatesOf, onHover: pin })
 
   return (
     <Panel
       accent="semantic"
-      kicker="Semantic layer"
+      kicker="Semantic layer · semantic-state"
       title={`useSemantic("${ATTENTION_QUERY}")`}
       description={`Local embeddings + attention centroid learned from what you open. Ranked in a Web Worker; commit policy: ${policy}.`}
       stats={[
@@ -41,14 +48,14 @@ export function SemanticPanel() {
         },
         {
           label: 'network since ready',
-          value: String(semantic.networkRequests),
-          tone: semantic.networkRequests === 0 ? 'good' : 'bad',
+          value: semantic.networkRequests === null ? '—' : String(semantic.networkRequests),
+          tone: semantic.networkRequests === 0 ? 'good' : semantic.networkRequests === null ? undefined : 'bad',
           hint: 'Requests made by the worker after the model loaded',
         },
       ]}
       banner={
         <>
-          <ModelBanner status={semantic.status} progress={semantic.progress} error={semantic.error} />
+          <ModelBanner model={semantic.model} />
           <PendingBanner pending={semantic.pending} manual={policy === 'manual'} onCommit={semantic.commit} />
         </>
       }

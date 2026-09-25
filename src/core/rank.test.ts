@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { EMPTY_CENTROID, observe } from './centroid.ts'
+import { EMPTY_CENTROID, observe } from 'semantic-state/core'
 import { rankItems } from './rank.ts'
 import type { Vec } from './types.ts'
 

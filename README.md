@@ -1,7 +1,7 @@
 # semantic-state
 
-> **Experimental.** A research project, not a published library: APIs change without notice, there is no npm package
-> yet, and the numbers come from small datasets. Use it to explore the idea, not in production.
+> **Experimental.** A research project: APIs change without notice, it is published only under the `experimental` npm
+> tag (`npm install semantic-state@experimental`), and the numbers come from small datasets. Not for production.
 
 React state that is **ranked by meaning instead of looked up by key**, computed on-device in a Web Worker.
 

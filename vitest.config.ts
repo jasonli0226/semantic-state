@@ -1,9 +1,11 @@
 import react from '@vitejs/plugin-react'
+import { defaultClientConditions } from 'vite'
 import { defineConfig } from 'vitest/config'
 
 /** One test run for the library and every example. */
 export default defineConfig({
   plugins: [react()],
+  resolve: { conditions: ['source', ...defaultClientConditions] },
   test: {
     environment: 'jsdom',
     setupFiles: ['./test-setup.ts'],

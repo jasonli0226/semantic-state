@@ -37,6 +37,11 @@ Then write a worker file, create a store and use the hooks — see the
 
 ![Semantic Pokédex](docs/pokedex-search.png)
 
+## Roadmap
+
+What's next — CI, server-rendering support, persistence, larger collections — is in [ROADMAP.md](ROADMAP.md), with one
+issue per item.
+
 ## Repo layout
 
 ```

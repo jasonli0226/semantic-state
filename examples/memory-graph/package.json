@@ -1,0 +1,25 @@
+{
+  "name": "semantic-state-example-memory-graph",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Memory graph: explore ~1000 Wikipedia articles by meaning; what you explore changes what stands out.",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -p tsconfig.json && vite build",
+    "preview": "vite preview",
+    "eval": "node --conditions=source scripts/eval-graph.ts",
+    "build:data": "node --conditions=source scripts/build-wiki.ts"
+  },
+  "dependencies": {
+    "@huggingface/transformers": "^4.3.0",
+    "d3-force": "^3.0.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "semantic-state": "0.1.0-experimental.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/d3-force": "^3.0.10"
+  }
+}

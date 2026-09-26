@@ -24,7 +24,12 @@ function start() {
       root.render(
         <StrictMode>
           <SemanticProvider store={store}>
-            <App articles={articles} seedId={seed.id} loadMs={Math.round(performance.now() - started)} />
+            <App
+              articles={articles}
+              vectors={new Map((vectors ?? []).map(([id, vector]) => [Number(id), vector]))}
+              seedId={seed.id}
+              loadMs={Math.round(performance.now() - started)}
+            />
           </SemanticProvider>
         </StrictMode>,
       )

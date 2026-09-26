@@ -12,7 +12,13 @@ export default defineConfig({
     include: ['packages/*/src/**/*.test.{ts,tsx}', 'examples/*/src/**/*.test.{ts,tsx}'],
     coverage: {
       provider: 'v8',
-      include: ['packages/semantic-state/src/**', 'examples/inbox/src/{core,app}/**', 'examples/pokedex/src/{data,features}.ts'],
+      include: [
+        'packages/semantic-state/src/**',
+        'examples/inbox/src/{core,app}/**',
+        'examples/pokedex/src/{data,features}.ts',
+        'examples/memory-graph/src/{data,wiki,features,source}.ts',
+        'examples/memory-graph/src/graph/**',
+      ],
       exclude: ['**/*.test.*', '**/index.ts', 'packages/semantic-state/src/embedders/**'],
     },
   },

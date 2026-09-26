@@ -52,18 +52,25 @@ describe('enforceCap', () => {
 })
 
 describe('pickSearchSeed', () => {
-  const row = (id: number, confidence: number, kind: 'search' | 'interest') => ({ id, confidence, reason: { kind, becauseOf: null } })
+  const unit = (x: number, y: number) => new Float32Array([x, y])
+  const vectors = new Map([
+    [1, unit(1, 0)],
+    [2, unit(0, 1)],
+    [3, unit(0.6, 0.8)],
+  ])
 
-  it('seeds from the best search match', () => {
-    expect(pickSearchSeed([row(4, 0.9, 'interest'), row(7, 0.6, 'search')], 0.35)).toEqual({ kind: 'seed', id: 7 })
+  it('seeds from the article most similar to the query itself', () => {
+    // (0.8, 0.6) is closest to article 3 (0.6, 0.8): 0.96, ahead of article 1: 0.8. Float32, so toBeCloseTo.
+    const pick = pickSearchSeed(unit(0.8, 0.6), vectors, 0.3)
+    expect(pick).toMatchObject({ kind: 'seed', id: 3 })
+    expect(pick.kind === 'seed' && pick.similarity).toBeCloseTo(0.96)
   })
 
-  it('reports weak when the best search match is below the threshold', () => {
-    expect(pickSearchSeed([row(7, 0.2, 'search')], 0.35)).toEqual({ kind: 'weak' })
+  it('reports weak when even the best article is below the threshold', () => {
+    expect(pickSearchSeed(unit(-1, 0), vectors, 0.3)).toEqual({ kind: 'weak' })
   })
 
-  it('reports weak when nothing matched the query itself', () => {
-    expect(pickSearchSeed([row(4, 0.9, 'interest')], 0.35)).toEqual({ kind: 'weak' })
-    expect(pickSearchSeed([], 0.35)).toEqual({ kind: 'weak' })
+  it('reports weak when there are no articles', () => {
+    expect(pickSearchSeed(unit(1, 0), new Map(), 0.3)).toEqual({ kind: 'weak' })
   })
 })

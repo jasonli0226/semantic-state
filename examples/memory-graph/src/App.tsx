@@ -1,7 +1,7 @@
-import { type Id, normalizeQuery } from 'semantic-state'
-import { COMMIT_DEFAULTS, useSemantic, useSemanticSnapshot, useSemanticStore } from 'semantic-state/react'
+import { type Id, type Vec, normalizeQuery } from 'semantic-state'
+import { COMMIT_DEFAULTS, useSemantic, useSemanticStore } from 'semantic-state/react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { K, LANE_COUNT, NODE_CAP, WEAK_MATCH } from './config.ts'
+import { K, LANE_COUNT, MIN_QUERY_SIMILARITY, NODE_CAP } from './config.ts'
 import { assignLanes, encode } from './graph/encoding.ts'
 import { type ExpandedOrder, enforceCap, expand, pickSearchSeed, visibleNodes } from './graph/explored.ts'
 import { useHeldVisuals } from './graph/useHeldVisuals.ts'
@@ -13,13 +13,15 @@ import { NodeDetail } from './ui/NodeDetail.tsx'
 
 interface Props {
   readonly articles: readonly Article[]
+  /** Text vectors by article id, for matching a search against the query alone. */
+  readonly vectors: ReadonlyMap<number, Vec>
   readonly seedId: number
   readonly loadMs: number
 }
 
 const prefersMotion = () => !window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
-export default function App({ articles, seedId, loadMs }: Props) {
+export default function App({ articles, vectors, seedId, loadMs }: Props) {
   const store = useSemanticStore<Article>()
   const byId = useMemo(() => new Map(articles.map((a) => [a.id, a])), [articles])
   const titleOf = useCallback((id: Id) => byId.get(Number(id))?.title ?? String(id), [byId])
@@ -31,6 +33,7 @@ export default function App({ articles, seedId, loadMs }: Props) {
   const [topicWeight, setTopicWeight] = useState(DEFAULT_WEIGHTS.topic)
   const [announcement, setAnnouncement] = useState('')
   const [lanes, setLanes] = useState<ReadonlyMap<Id, number>>(() => new Map())
+  const [queryVectors, setQueryVectors] = useState<ReadonlyMap<string, Vec>>(() => new Map())
   const [animate] = useState(prefersMotion)
   const seeded = useRef(false)
 
@@ -41,8 +44,10 @@ export default function App({ articles, seedId, loadMs }: Props) {
     store.interact(seedId)
   }, [store, seedId])
 
+  // The worker embeds each query once and caches it, so keep every vector it sends.
+  useEffect(() => store.onQueryEmbedded((q, vector) => setQueryVectors((m) => new Map(m).set(q, vector))), [store])
+
   const { beliefs, interests, model, rankMs, status, error } = useSemantic<Article>(query)
-  const { results } = useSemanticSnapshot<Article>()
   const { neighboursOf, edges } = useNeighbors(order, K)
   const shownOrder = useMemo(() => enforceCap(order, neighboursOf, NODE_CAP), [order, neighboursOf])
   const nodes = useMemo(() => visibleNodes(shownOrder, neighboursOf), [shownOrder, neighboursOf])
@@ -72,16 +77,16 @@ export default function App({ articles, seedId, loadMs }: Props) {
     [store, titleOf],
   )
 
-  // After a search is submitted, its best confident match becomes the next expanded article.
-  const result = results[normalizeQuery(query)]
+  // After a search is submitted, the article that best matches the query text becomes the next expanded one.
+  const queryVec = queryVectors.get(normalizeQuery(query))
   useEffect(() => {
-    if (!awaitingSeed || !result) return
+    if (!awaitingSeed || !queryVec) return
     // oxlint-disable-next-line react/set-state-in-effect
     setAwaitingSeed(false)
-    const pick = pickSearchSeed(result.ranked, WEAK_MATCH)
+    const pick = pickSearchSeed(queryVec, vectors, MIN_QUERY_SIMILARITY)
     if (pick.kind === 'seed') activate(pick.id)
     else setHint(`Only weak matches for “${query}”`)
-  }, [awaitingSeed, result, activate, query])
+  }, [awaitingSeed, queryVec, vectors, activate, query])
 
   const onSearch = (raw: string) => {
     const text = raw.trim()

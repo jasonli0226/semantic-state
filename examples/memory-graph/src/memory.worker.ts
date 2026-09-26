@@ -15,4 +15,7 @@ defineSemanticWorker<Article>({
   interests: { mode: 'multi' },
   weights: DEFAULT_WEIGHTS,
   resultLimit: RESULT_LIMIT,
+  // Sends each new query vector to the main thread, which picks the search seed by the query alone.
+  // Vectors passed in with upsert are not echoed back.
+  emitVectors: true,
 })

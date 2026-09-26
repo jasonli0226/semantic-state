@@ -46,6 +46,7 @@ Then write a worker file, create a store and use the hooks — see the
 |---|---|
 | [**Dev inbox**](examples/inbox) | Rules vs `useSemantic("what needs my attention right now")`: centroid attention, a custom scorer with deadlines, near-duplicate folding, a scripted 5-step scenario with precision@5 (rules 0–2/5, semantic 4–5/5 after a few clicks) |
 | [**Semantic Pokédex**](examples/pokedex) | Free-text search over 1025 Pokémon, multi-interest clicks with lanes, "similar to" with adjustable weights, build-time vectors |
+| [**Memory graph**](examples/memory-graph) | ~1000 Wikipedia articles as an explorable graph: nearest neighbours for structure, `useSemantic` beliefs for size and colour, visuals held still while you work, build-time vectors behind a swappable source |
 
 ![Semantic Pokédex](docs/pokedex-search.png)
 
@@ -60,6 +61,7 @@ issue per item.
 packages/semantic-state/   the library, published to npm as `semantic-state`
 examples/inbox/            dev-inbox demo + eval
 examples/pokedex/          Pokédex demo + data build + eval
+examples/memory-graph/     Wikipedia memory-graph demo + data build + eval
 e2e/                       Playwright tests for both examples
 ```
 
@@ -67,13 +69,14 @@ e2e/                       Playwright tests for both examples
 
 ```bash
 npm install
-npm run dev:inbox          # or dev:pokedex
+npm run dev:inbox          # or dev:pokedex, dev:graph
 npm test                   # library + example unit tests (vitest)
 npm run typecheck && npm run lint
 npm run e2e                # Playwright against system Chrome, both examples
 npm run smoke:pack         # pack the library, install the tarball in a scratch app, import/tsc/Vite-build it
 npm run eval:inbox         # headless evals with real embeddings
 npm run eval:pokedex
+npm run eval:graph
 ```
 
 The first page load downloads the embedding model (~23 MB) once; the browser caches it.

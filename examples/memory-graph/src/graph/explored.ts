@@ -1,4 +1,4 @@
-import type { Id, Reason } from 'semantic-state'
+import { type Vec, dot } from 'semantic-state/core'
 
 /**
  * What's on screen is derived, not stored: the ids the user expanded (oldest first) plus each one's
@@ -34,16 +34,17 @@ export function enforceCap(order: ExpandedOrder, neighboursOf: NeighbourMap, cap
   return kept
 }
 
-export type SearchSeed = { readonly kind: 'seed'; readonly id: number } | { readonly kind: 'weak' }
+export type SearchSeed = { readonly kind: 'seed'; readonly id: number; readonly similarity: number } | { readonly kind: 'weak' }
 
-interface RankedRow {
-  readonly id: Id
-  readonly confidence: number
-  readonly reason: Reason
-}
-
-/** The best row that matched the query itself (not an interest), if it's confident enough. */
-export function pickSearchSeed(rows: readonly RankedRow[], minConfidence: number): SearchSeed {
-  const top = rows.find((r) => r.reason.kind === 'search')
-  return top && top.confidence >= minConfidence ? { kind: 'seed', id: Number(top.id) } : { kind: 'weak' }
+/**
+ * The article whose text best matches the query itself. Deliberately not the worker's ranking: that blends
+ * in the user's interests (60/40), so an unrelated click would weaken — and even change — an explicit search.
+ */
+export function pickSearchSeed(queryVec: Vec, vectors: ReadonlyMap<number, Vec>, minSimilarity: number): SearchSeed {
+  let best: { id: number; similarity: number } | null = null
+  for (const [id, vector] of vectors) {
+    const similarity = dot(queryVec, vector)
+    if (!best || similarity > best.similarity) best = { id, similarity }
+  }
+  return best && best.similarity >= minSimilarity ? { kind: 'seed', ...best } : { kind: 'weak' }
 }

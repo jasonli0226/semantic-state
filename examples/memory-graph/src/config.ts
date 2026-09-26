@@ -11,7 +11,10 @@ export const NODE_CAP = 60
 export const SEED_TITLE = 'Moon'
 /** Beliefs per query from the worker — enough to cover every visible node. */
 export const RESULT_LIMIT = 60
-/** A search whose best match is less confident than this doesn't move the graph. */
-export const WEAK_MATCH = 0.35
+/**
+ * A search whose best article is less similar than this (cosine, query text vs article text) doesn't move the
+ * graph. Measured on the Level 3 data: nonsense queries top out around 0.24, real ones start near 0.45.
+ */
+export const MIN_QUERY_SIMILARITY = 0.3
 /** Interest lanes, one colour each (the library keeps at most 6 interests). */
 export const LANE_COUNT = 6

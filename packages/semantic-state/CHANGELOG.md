@@ -16,6 +16,9 @@ breaking changes are listed under **Changed** or **Removed**.
 - `useSemantic`, `useSimilar` and `useSemanticSnapshot` no longer throw during server rendering (Next.js,
   `renderToString`); they render the initial snapshot and hydrate from it.
   ([#9](https://github.com/jasonli0226/semantic-state/issues/9))
+- `useSemantic` returns the same empty `interests` array on every render before the first result, instead of a new
+  one each time, so memos and effects that depend on it no longer re-run on every render.
+  ([#24](https://github.com/jasonli0226/semantic-state/issues/24))
 
 ## [0.1.0-experimental.0] - 2026-09-25
 

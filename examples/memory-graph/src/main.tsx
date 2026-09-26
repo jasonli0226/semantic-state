@@ -18,7 +18,8 @@ function start() {
   const started = performance.now()
   source
     .load()
-    .then(({ articles, vectors }) => {
+    .then(({ articles, vectors, positions }) => {
+      if (!positions) throw new Error('This source has no map positions (run npm run build:layout)')
       const seed = findSeed(articles, SEED_TITLE)
       store.upsert(articles, vectors ? { vectors } : undefined)
       root.render(
@@ -27,6 +28,7 @@ function start() {
             <App
               articles={articles}
               vectors={new Map((vectors ?? []).map(([id, vector]) => [Number(id), vector]))}
+              positions={new Map([...positions].map(([id, p]) => [Number(id), p]))}
               seedId={seed.id}
               loadMs={Math.round(performance.now() - started)}
             />

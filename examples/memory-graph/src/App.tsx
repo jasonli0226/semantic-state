@@ -1,15 +1,16 @@
 import { type Id, type Vec, normalizeQuery } from 'semantic-state'
 import { COMMIT_DEFAULTS, useSemantic, useSemanticStore } from 'semantic-state/react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { K, LANE_COUNT, MIN_QUERY_SIMILARITY, NODE_CAP } from './config.ts'
+import { K, LANE_COUNT, MIN_QUERY_SIMILARITY, TRAIL_FADE, TRAIL_LENGTH } from './config.ts'
 import { assignLanes, encode } from './graph/encoding.ts'
-import { type ExpandedOrder, enforceCap, expand, pickSearchSeed, visibleNodes } from './graph/explored.ts'
+import { type ExpandedOrder, expand, pickSearchSeed, trail } from './graph/explored.ts'
+import type { Point } from './graph/mapLayout.ts'
 import { useHeldVisuals } from './graph/useHeldVisuals.ts'
 import { useNeighbors } from './graph/useNeighbors.ts'
 import { type Article, DEFAULT_WEIGHTS } from './types.ts'
 import { Attribution } from './ui/Attribution.tsx'
 import { Controls } from './ui/Controls.tsx'
-import { GraphView } from './ui/GraphView.tsx'
+import { GraphView, type TrailEdge } from './ui/GraphView.tsx'
 import { NodeDetail } from './ui/NodeDetail.tsx'
 import { modelNote, searchDisabledReason } from './ui/status.ts'
 
@@ -17,15 +18,19 @@ interface Props {
   readonly articles: readonly Article[]
   /** Text vectors by article id, for matching a search against the query alone. */
   readonly vectors: ReadonlyMap<number, Vec>
+  /** Fixed map position by article id. */
+  readonly positions: ReadonlyMap<number, Point>
   readonly seedId: number
   readonly loadMs: number
 }
 
 const prefersMotion = () => !window.matchMedia('(prefers-reduced-motion: reduce)').matches
+const edgeKey = (a: number, b: number) => (a < b ? `${a}-${b}` : `${b}-${a}`)
 
-export default function App({ articles, vectors, seedId, loadMs }: Props) {
+export default function App({ articles, vectors, positions, seedId, loadMs }: Props) {
   const store = useSemanticStore<Article>()
   const byId = useMemo(() => new Map(articles.map((a) => [a.id, a])), [articles])
+  const ids = useMemo(() => articles.map((a) => a.id), [articles])
   const titleOf = useCallback((id: Id) => byId.get(Number(id))?.title ?? String(id), [byId])
   const [order, setOrder] = useState<ExpandedOrder>(() => [seedId])
   const [selected, setSelected] = useState<number>(seedId)
@@ -36,6 +41,7 @@ export default function App({ articles, vectors, seedId, loadMs }: Props) {
   const [announcement, setAnnouncement] = useState('')
   const [lanes, setLanes] = useState<ReadonlyMap<Id, number>>(() => new Map())
   const [queryVectors, setQueryVectors] = useState<ReadonlyMap<string, Vec>>(() => new Map())
+  const [cameraTarget, setCameraTarget] = useState<{ id: number; seq: number } | null>(null)
   const [animate] = useState(prefersMotion)
   const seeded = useRef(false)
 
@@ -50,13 +56,21 @@ export default function App({ articles, vectors, seedId, loadMs }: Props) {
   useEffect(() => store.onQueryEmbedded((q, vector) => setQueryVectors((m) => new Map(m).set(q, vector))), [store])
 
   const { beliefs, interests, model, rankMs, status, error } = useSemantic<Article>(query)
-  const { neighboursOf, edges } = useNeighbors(order, K)
-  const shownOrder = useMemo(() => enforceCap(order, neighboursOf, NODE_CAP), [order, neighboursOf])
-  const nodes = useMemo(() => visibleNodes(shownOrder, neighboursOf), [shownOrder, neighboursOf])
-  const shownEdges = useMemo(() => {
-    const visible = new Set(nodes.map((n) => n.id))
-    return edges.filter((e) => visible.has(e.source) && visible.has(e.target))
-  }, [nodes, edges])
+  const trailIds = useMemo(() => trail(order, TRAIL_LENGTH), [order])
+  const { neighboursOf, edges } = useNeighbors(trailIds, K)
+  const trailEdges = useMemo((): TrailEdge[] => {
+    const recency = new Map(trailIds.map((id, i) => [id, i]))
+    const newest = trailIds.length - 1
+    return edges.map((e) => {
+      const at = Math.max(recency.get(e.source) ?? -1, recency.get(e.target) ?? -1)
+      return { ...e, opacity: TRAIL_FADE ** (newest - at) }
+    })
+  }, [edges, trailIds])
+  const similarityOf = useMemo(() => new Map(edges.map((e) => [edgeKey(e.source, e.target), e.similarity])), [edges])
+  const nearest = useMemo(
+    () => (neighboursOf.get(selected) ?? []).map((id) => ({ id, title: titleOf(id), similarity: similarityOf.get(edgeKey(selected, id)) ?? 0 })),
+    [neighboursOf, selected, titleOf, similarityOf],
+  )
 
   const nextLanes = assignLanes(lanes, interests.map((i) => i.id), LANE_COUNT)
   if (nextLanes !== lanes) setLanes(nextLanes)
@@ -65,8 +79,8 @@ export default function App({ articles, vectors, seedId, loadMs }: Props) {
     const beliefById = new Map(beliefs.map((b) => [b.value.id, b]))
     const weightById = new Map(interests.map((i) => [Number(i.id), i.weight]))
     const ctx = { query, lanes: nextLanes, titleOf }
-    return new Map(nodes.map((n) => [n.id, encode(n.id, { belief: beliefById.get(n.id), interestWeight: weightById.get(n.id) }, ctx)]))
-  }, [nodes, beliefs, interests, query, nextLanes, titleOf])
+    return new Map(ids.map((id) => [id, encode(id, { belief: beliefById.get(id), interestWeight: weightById.get(id) }, ctx)]))
+  }, [ids, beliefs, interests, query, nextLanes, titleOf])
   const selectedOnly = useMemo(() => new Set([selected]), [selected])
   const held = useHeldVisuals(fresh, COMMIT_DEFAULTS.idleMs, selectedOnly)
 
@@ -75,20 +89,22 @@ export default function App({ articles, vectors, seedId, loadMs }: Props) {
       setOrder((o) => expand(o, id))
       setSelected(id)
       store.interact(id)
-      setAnnouncement(`Expanded ${titleOf(id)}, showing its ${K} nearest articles`)
+      setAnnouncement(`Explored ${titleOf(id)}: its ${K} nearest articles are linked on the map`)
     },
     [store, titleOf],
   )
 
-  // After a search is submitted, the article that best matches the query text becomes the next expanded one.
+  // After a search is submitted, the article that best matches the query text is explored and the camera goes there.
   const queryVec = queryVectors.get(normalizeQuery(query))
   useEffect(() => {
     if (!awaitingSeed || !queryVec) return
     // oxlint-disable-next-line react/set-state-in-effect
     setAwaitingSeed(false)
     const pick = pickSearchSeed(queryVec, vectors, MIN_QUERY_SIMILARITY)
-    if (pick.kind === 'seed') activate(pick.id)
-    else setHint(`Only weak matches for “${query}”`)
+    if (pick.kind === 'seed') {
+      activate(pick.id)
+      setCameraTarget((c) => ({ id: pick.id, seq: (c?.seq ?? 0) + 1 }))
+    } else setHint(`Only weak matches for “${query}”`)
   }, [awaitingSeed, queryVec, vectors, activate, query])
 
   const onSearch = (raw: string) => {
@@ -111,22 +127,25 @@ export default function App({ articles, vectors, seedId, loadMs }: Props) {
     setAnnouncement(`Reset to ${titleOf(seedId)}`)
   }
 
+  const summary = `${articles.length} articles · trail of your last ${trailIds.length} ${trailIds.length === 1 ? 'click' : 'clicks'}`
 
   return (
     <div className="app">
       <header>
         <h1>Memory graph</h1>
-        <p>Click an article to expand its nearest neighbours by meaning. What you explore changes what stands out.</p>
+        <p>Every article on one map. Click one: related articles light up everywhere, and its nearest neighbours are linked.</p>
       </header>
       <GraphView
-        nodes={nodes}
-        edges={shownEdges}
+        ids={ids}
+        positions={positions}
+        edges={trailEdges}
         visuals={held.visuals}
         titleOf={titleOf}
         selected={selected}
         onActivate={activate}
         panelProps={held.panelProps}
         animate={animate}
+        cameraTarget={cameraTarget}
       />
       <aside className="side">
         <Controls
@@ -137,15 +156,13 @@ export default function App({ articles, vectors, seedId, loadMs }: Props) {
           topicWeight={topicWeight}
           onTopicWeight={onTopicWeight}
           pending={held.pending}
-          nodeCount={nodes.length}
-          capped={shownOrder.length < order.length}
+          summary={summary}
           onReset={onReset}
         />
-        <NodeDetail article={byId.get(selected)} visual={held.visuals.get(selected)} />
+        <NodeDetail article={byId.get(selected)} visual={held.visuals.get(selected)} neighbours={nearest} onActivate={activate} />
       </aside>
       <footer>
-        <Attribution /> · {articles.length} articles ·
-        data {loadMs} ms · ranked in {rankMs === null ? '–' : `${rankMs.toFixed(1)} ms`}
+        <Attribution /> · data {loadMs} ms · ranked in {rankMs === null ? '–' : `${rankMs.toFixed(1)} ms`}
       </footer>
       <p className="sr-only" aria-live="polite">
         {announcement}

@@ -7,9 +7,11 @@ import { type ExpandedOrder, enforceCap, expand, pickSearchSeed, visibleNodes } 
 import { useHeldVisuals } from './graph/useHeldVisuals.ts'
 import { useNeighbors } from './graph/useNeighbors.ts'
 import { type Article, DEFAULT_WEIGHTS } from './types.ts'
+import { Attribution } from './ui/Attribution.tsx'
 import { Controls } from './ui/Controls.tsx'
 import { GraphView } from './ui/GraphView.tsx'
 import { NodeDetail } from './ui/NodeDetail.tsx'
+import { modelNote, searchDisabledReason } from './ui/status.ts'
 
 interface Props {
   readonly articles: readonly Article[]
@@ -65,7 +67,8 @@ export default function App({ articles, vectors, seedId, loadMs }: Props) {
     const ctx = { query, lanes: nextLanes, titleOf }
     return new Map(nodes.map((n) => [n.id, encode(n.id, { belief: beliefById.get(n.id), interestWeight: weightById.get(n.id) }, ctx)]))
   }, [nodes, beliefs, interests, query, nextLanes, titleOf])
-  const held = useHeldVisuals(fresh, COMMIT_DEFAULTS.idleMs)
+  const selectedOnly = useMemo(() => new Set([selected]), [selected])
+  const held = useHeldVisuals(fresh, COMMIT_DEFAULTS.idleMs, selectedOnly)
 
   const activate = useCallback(
     (id: number) => {
@@ -108,14 +111,6 @@ export default function App({ articles, vectors, seedId, loadMs }: Props) {
     setAnnouncement(`Reset to ${titleOf(seedId)}`)
   }
 
-  const modelNote =
-    model.status === 'loading' ? `Loading search model… ${Math.round(model.progress * 100)}%` : model.status === 'ready' ? 'Search model ready' : null
-  const searchDisabledReason =
-    status === 'error'
-      ? `Search unavailable: the worker stopped (${error ?? 'unknown error'})`
-      : model.status === 'error'
-        ? `Search unavailable: ${model.error ?? 'model failed to load'}`
-        : null
 
   return (
     <div className="app">
@@ -136,8 +131,8 @@ export default function App({ articles, vectors, seedId, loadMs }: Props) {
       <aside className="side">
         <Controls
           onSearch={onSearch}
-          searchDisabledReason={searchDisabledReason}
-          modelNote={modelNote}
+          searchDisabledReason={searchDisabledReason(status, error, model)}
+          modelNote={modelNote(model)}
           hint={hint}
           topicWeight={topicWeight}
           onTopicWeight={onTopicWeight}
@@ -149,7 +144,7 @@ export default function App({ articles, vectors, seedId, loadMs }: Props) {
         <NodeDetail article={byId.get(selected)} visual={held.visuals.get(selected)} />
       </aside>
       <footer>
-        Text from <a href="https://en.wikipedia.org/wiki/Wikipedia:Vital_articles/Level/3">Wikipedia</a>, CC BY-SA 4.0 · {articles.length} articles ·
+        <Attribution /> · {articles.length} articles ·
         data {loadMs} ms · ranked in {rankMs === null ? '–' : `${rankMs.toFixed(1)} ms`}
       </footer>
       <p className="sr-only" aria-live="polite">

@@ -108,6 +108,8 @@ export function GraphView({ nodes, edges, visuals, titleOf, selected, onActivate
               onKeyDown={onKeyDown(id)}
               onPointerEnter={() => setHovered(id)}
               onPointerLeave={() => setHovered(null)}
+              onFocus={() => setHovered(id)}
+              onBlur={() => setHovered(null)}
             >
               {v.ring > 0 && <circle className="ring" r={v.radius + 5} opacity={v.ring} />}
               <circle className="dot" r={v.radius} />

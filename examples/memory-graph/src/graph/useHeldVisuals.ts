@@ -4,11 +4,13 @@ import { type Visual, sameVisual } from './encoding.ts'
 
 export type Visuals = ReadonlyMap<number, Visual>
 
-/** Nodes present in both maps whose drawing differs. */
-export function countChanged(applied: Visuals, fresh: Visuals): number {
+const NONE: ReadonlySet<number> = new Set()
+
+/** Nodes present in both maps whose drawing differs (ignoring `skip`). */
+export function countChanged(applied: Visuals, fresh: Visuals, skip: ReadonlySet<number> = NONE): number {
   let changed = 0
   for (const [id, visual] of fresh) {
-    const old = applied.get(id)
+    const old = skip.has(id) ? undefined : applied.get(id)
     if (old && !sameVisual(old, visual)) changed += 1
   }
   return changed
@@ -18,14 +20,15 @@ export function countChanged(applied: Visuals, fresh: Visuals): number {
  * The library's commit policy holds the *order* of beliefs while the user works; their confidence is always
  * fresh. A graph shows values, not order, so this holds the visuals themselves: while the pointer is active
  * over the graph, drawn nodes keep their last applied look (new nodes appear at once); after `idleMs` of rest,
- * or when the pointer leaves, the fresh visuals apply.
+ * or when the pointer leaves, the fresh visuals apply. `alwaysFresh` nodes (the article the user just acted on)
+ * are never held: their explanation must describe the click, not the moment before it.
  */
-export function useHeldVisuals(fresh: Visuals, idleMs: number) {
+export function useHeldVisuals(fresh: Visuals, idleMs: number, alwaysFresh: ReadonlySet<number> = NONE) {
   const [applied, setApplied] = useState(fresh)
   const [recheck, setRecheck] = useState(0)
   const onLeave = useCallback(() => setRecheck((n) => n + 1), [])
   const { panelProps, quietFor } = useActivity(idleMs, onLeave)
-  const pending = useMemo(() => countChanged(applied, fresh), [applied, fresh])
+  const pending = useMemo(() => countChanged(applied, fresh, alwaysFresh), [applied, fresh, alwaysFresh])
 
   // Synchronizes with time and pointer activity (refs + timer), which render can't observe.
   useEffect(() => {
@@ -45,11 +48,11 @@ export function useHeldVisuals(fresh: Visuals, idleMs: number) {
     () =>
       new Map(
         [...fresh].map(([id, visual]) => {
-          const old = applied.get(id)
+          const old = alwaysFresh.has(id) ? undefined : applied.get(id)
           return [id, old && !sameVisual(old, visual) ? old : visual] as const
         }),
       ),
-    [fresh, applied],
+    [fresh, applied, alwaysFresh],
   )
   return { visuals: visuals as Visuals, pending, panelProps }
 }

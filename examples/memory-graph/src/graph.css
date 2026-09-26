@@ -53,7 +53,8 @@ body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 syst
 .node .dot { stroke: var(--panel); stroke-width: 1.5; transition: r 300ms ease, fill 300ms ease; }
 .node .ring { fill: none; stroke: currentColor; stroke-width: 2.5; transition: opacity 300ms ease; }
 .node text { fill: var(--text); font-size: 11px; text-anchor: middle; pointer-events: none; paint-order: stroke; stroke: var(--bg); stroke-width: 3px; }
-.node:focus-visible .dot, .node.selected .dot { stroke: var(--text); stroke-width: 2.5; }
+.node.selected .dot { stroke: var(--text); stroke-width: 2.5; }
+.node:focus-visible .dot { stroke: var(--text); stroke-width: 3; stroke-dasharray: 4 3; }
 .tone-search { color: var(--search); } .tone-search .dot { fill: var(--search); }
 .tone-muted { color: var(--muted); } .tone-muted .dot { fill: var(--muted); }
 .tone-lane-0 { color: var(--lane-0); } .tone-lane-0 .dot { fill: var(--lane-0); }

@@ -42,6 +42,17 @@ describe('useHeldVisuals', () => {
     expect(result.current.pending).toBe(0)
   })
 
+  it('never holds the articles passed as always fresh (the one just clicked)', () => {
+    const { result, rerender } = renderHook(({ fresh }) => useHeldVisuals(fresh, IDLE, new Set([1])), {
+      initialProps: { fresh: new Map([[1, v(8)], [2, v(8)]]) },
+    })
+    act(() => result.current.panelProps.onPointerMove())
+    rerender({ fresh: new Map([[1, v(20)], [2, v(20)]]) })
+    expect(result.current.visuals.get(1)?.radius).toBe(20)
+    expect(result.current.visuals.get(2)?.radius).toBe(8)
+    expect(result.current.pending).toBe(1)
+  })
+
   it('applies held changes as soon as the pointer leaves', () => {
     const { result, rerender } = renderHook(({ fresh }) => useHeldVisuals(fresh, IDLE), { initialProps: { fresh: new Map([[1, v(8)]]) } })
     act(() => result.current.panelProps.onPointerMove())

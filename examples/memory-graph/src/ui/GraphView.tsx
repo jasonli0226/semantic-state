@@ -58,8 +58,8 @@ export function GraphView({ ids, positions, edges, visuals, titleOf, selected, o
     setCursor(selected)
   }
 
-  // Fit the whole map on first render and whenever the viewport size changes.
-  useEffect(() => moveTo(fitTransform(bounds, size)), [bounds, size, moveTo])
+  // Fit the whole map on first render and whenever the viewport size changes — instantly, so the page never opens mid-flight.
+  useEffect(() => moveTo(fitTransform(bounds, size), { instant: true }), [bounds, size, moveTo])
 
   // Only a new request moves the camera, not a resize: the latest size and positions are read through a ref.
   const latest = useRef({ positions, size, moveTo })

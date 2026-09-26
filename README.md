@@ -46,7 +46,7 @@ Then write a worker file, create a store and use the hooks — see the
 |---|---|
 | [**Dev inbox**](examples/inbox) | Rules vs `useSemantic("what needs my attention right now")`: centroid attention, a custom scorer with deadlines, near-duplicate folding, a scripted 5-step scenario with precision@5 (rules 0–2/5, semantic 4–5/5 after a few clicks) |
 | [**Semantic Pokédex**](examples/pokedex) | Free-text search over 1025 Pokémon, multi-interest clicks with lanes, "similar to" with adjustable weights, build-time vectors |
-| [**Memory graph**](examples/memory-graph) | ~1000 Wikipedia articles as an explorable graph: nearest neighbours for structure, `useSemantic` beliefs for size and colour, visuals held still while you work, build-time vectors behind a swappable source |
+| [**Memory graph**](examples/memory-graph) | ~1000 Wikipedia articles on one zoomable map: a click lights up related articles everywhere and leaves a trail of nearest neighbours; build-time layout and vectors behind a swappable source |
 
 ![Semantic Pokédex](docs/pokedex-search.png)
 

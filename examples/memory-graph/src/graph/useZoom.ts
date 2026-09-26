@@ -1,15 +1,23 @@
 import { select } from 'd3-selection'
 import 'd3-transition'
 import { type D3ZoomEvent, zoom, zoomIdentity } from 'd3-zoom'
-import { type RefObject, useCallback, useEffect, useMemo, useState } from 'react'
+import { type RefObject, useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import { SCALE_EXTENT, type Size, type Transform } from './camera.ts'
 
 const FALLBACK_SIZE: Size = { width: 800, height: 600 }
 const MOVE_MS = 400
 
-/** The element's size, kept current with ResizeObserver (absent in jsdom → a fixed fallback). */
+/**
+ * The element's size: measured before the first paint (so the map doesn't fit twice and jump on load), then kept
+ * current with ResizeObserver. jsdom has neither layout nor ResizeObserver → a fixed fallback.
+ */
 export function useViewportSize(ref: RefObject<Element | null>): Size {
   const [size, setSize] = useState<Size>(FALLBACK_SIZE)
+  useLayoutEffect(() => {
+    const rect = ref.current?.getBoundingClientRect()
+    // oxlint-disable-next-line react/set-state-in-effect
+    if (rect && rect.width > 0 && rect.height > 0) setSize({ width: rect.width, height: rect.height })
+  }, [ref])
   useEffect(() => {
     const el = ref.current
     if (!el || typeof ResizeObserver === 'undefined') return
@@ -53,11 +61,11 @@ export function useZoom(ref: RefObject<SVGSVGElement | null>, size: Size, animat
   }, [ref, behavior])
 
   const moveTo = useCallback(
-    (t: Transform) => {
+    (t: Transform, { instant = false } = {}) => {
       const svg = ref.current
       if (!svg) return
       const target = zoomIdentity.translate(t.x, t.y).scale(t.k)
-      if (animate) select(svg).transition().duration(MOVE_MS).call(behavior.transform, target)
+      if (animate && !instant) select(svg).transition().duration(MOVE_MS).call(behavior.transform, target)
       else select(svg).call(behavior.transform, target)
     },
     [ref, behavior, animate],

@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "eval": "node --conditions=source scripts/eval-graph.ts",
     "build:data": "node --conditions=source scripts/build-wiki.ts",
-    "build:layout": "node --conditions=source scripts/build-layout.ts"
+    "build:layout": "node --conditions=source scripts/build-layout.ts",
+    "measure:fps": "node scripts/measure-fps.ts"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.3.0",

@@ -79,6 +79,21 @@ test('zoom buttons change the scale and Fit restores it', async ({ page }) => {
   await expect.poll(() => worldScale(page)).toBeCloseTo(fitted, 2)
 })
 
+test('clicking articles never moves the camera, even when the side panel changes height', async ({ page }) => {
+  // A shorter window, where the side panel's height (abstract length, neighbour list) exceeds the map's row.
+  await page.setViewportSize({ width: 1280, height: 720 })
+  await open(page)
+  await page.getByRole('button', { name: 'Zoom in' }).click()
+  await page.getByRole('button', { name: 'Zoom in' }).click()
+  await page.waitForTimeout(300)
+  const zoomed = await worldTransform(page)
+  for (const i of [0, 1, 2]) {
+    await nearest(page).nth(i).dispatchEvent('click')
+    await page.waitForTimeout(400)
+    expect(await worldTransform(page)).toBe(zoomed)
+  }
+})
+
 test('reset forgets what you explored', async ({ page }) => {
   await open(page)
   await nearest(page).first().dispatchEvent('click')

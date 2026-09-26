@@ -20,7 +20,8 @@ export interface Bounds {
   readonly maxY: number
 }
 
-export const SCALE_EXTENT = [0.3, 8] as const
+/** Low enough that Fit shows the whole map on a phone-width screen. */
+export const SCALE_EXTENT = [0.1, 8] as const
 /** Zoom level the camera moves to for a search result. */
 export const SEARCH_SCALE = 2
 const LABEL_RANKED_SCALE = 1.5
@@ -48,6 +49,11 @@ export const centerOn = (point: Point, viewport: Size, k: number): Transform => 
   y: viewport.height / 2 - point.y * k,
   k,
 })
+
+/** Same world point in the middle, same scale, new viewport size — for resizes after the user moved the camera. */
+export function keepCentre(t: Transform, from: Size, to: Size): Transform {
+  return centerOn({ x: (from.width / 2 - t.x) / t.k, y: (from.height / 2 - t.y) / t.k }, to, t.k)
+}
 
 export const toScreen = (point: Point, t: Transform): Point => ({ x: point.x * t.k + t.x, y: point.y * t.k + t.y })
 

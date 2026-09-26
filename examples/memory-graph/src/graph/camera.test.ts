@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { boundsOf, centerOn, fitTransform, labelVisible, onScreen, toScreen, transformAttr } from './camera.ts'
+import { boundsOf, centerOn, fitTransform, keepCentre, labelVisible, onScreen, toScreen, transformAttr } from './camera.ts'
 
 const view = { width: 1000, height: 500 }
 const bounds = boundsOf([{ x: -1000, y: -500 }, { x: 1000, y: 500 }])
@@ -12,8 +12,13 @@ describe('fitTransform', () => {
   })
 
   it('uses the viewport it is given (resized window)', () => {
-    expect(fitTransform(bounds, { width: 500, height: 500 }, 0).k).toBeCloseTo(0.3)
+    expect(fitTransform(bounds, { width: 500, height: 500 }, 0).k).toBeCloseTo(0.25)
     expect(fitTransform(bounds, { width: 4000, height: 2000 }, 0).k).toBeCloseTo(2)
+  })
+
+  it('fits the whole map on a phone-width screen instead of clamping to a larger scale', () => {
+    const map = boundsOf([{ x: -1000, y: -1000 }, { x: 1000, y: 1000 }])
+    expect(fitTransform(map, { width: 390, height: 844 }).k).toBeCloseTo(310 / 2000)
   })
 
   it('clamps the scale to the zoom extent', () => {
@@ -56,5 +61,14 @@ describe('labelVisible', () => {
 describe('transformAttr', () => {
   it('formats the SVG transform', () => {
     expect(transformAttr({ x: 5, y: -2, k: 1.5 })).toBe('translate(5 -2) scale(1.5)')
+  })
+})
+
+describe('keepCentre', () => {
+  it('keeps the same world point in the middle and the same scale when the viewport resizes', () => {
+    const t = centerOn({ x: 120, y: -40 }, { width: 800, height: 600 }, 2.5)
+    const kept = keepCentre(t, { width: 800, height: 600 }, { width: 800, height: 900 })
+    expect(kept.k).toBe(2.5)
+    expect(toScreen({ x: 120, y: -40 }, kept)).toEqual({ x: 400, y: 450 })
   })
 })

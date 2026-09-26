@@ -1,5 +1,5 @@
 import { type HTMLAttributes, type KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react'
-import { boundsOf, centerOn, fitTransform, labelVisible, onScreen, SEARCH_SCALE, transformAttr } from '../graph/camera.ts'
+import { boundsOf, centerOn, fitTransform, keepCentre, labelVisible, onScreen, SEARCH_SCALE, transformAttr } from '../graph/camera.ts'
 import type { Visual } from '../graph/encoding.ts'
 import type { Point } from '../graph/mapLayout.ts'
 import type { Edge } from '../graph/useNeighbors.ts'
@@ -42,14 +42,25 @@ export function GraphView({ ids, positions, edges, visuals, titleOf, selected, o
   const container = useRef<HTMLDivElement>(null)
   const svg = useRef<SVGSVGElement>(null)
   const size = useViewportSize(container)
-  const { transform: t, zooming, moveTo, zoomBy } = useZoom(svg, size, animate)
+  // True while the camera shows the fitted map; any zoom, pan or search move clears it until Fit.
+  const fitted = useRef(true)
+  const { transform: t, zooming, moveTo, zoomBy: zoomByRaw } = useZoom(svg, size, animate, () => {
+    fitted.current = false
+  })
+  const zoomBy = (factor: number) => {
+    fitted.current = false
+    zoomByRaw(factor)
+  }
   const [hovered, setHovered] = useState<number | null>(null)
   const [cursor, setCursor] = useState(selected)
   const elements = useRef(new Map<number, SVGGElement>())
   const walk = useRef<{ origin: number; index: number } | null>(null)
   const neighboursOf = useMemo(() => adjacency(edges), [edges])
   const bounds = useMemo(() => boundsOf(positions.values()), [positions])
-  const fit = () => moveTo(fitTransform(bounds, size))
+  const fit = () => {
+    fitted.current = true
+    moveTo(fitTransform(bounds, size))
+  }
 
   // Cursor follows the selection (click, search, reset).
   const [shownSelected, setShownSelected] = useState(selected)
@@ -58,25 +69,38 @@ export function GraphView({ ids, positions, edges, visuals, titleOf, selected, o
     setCursor(selected)
   }
 
-  // Fit the whole map on first render and whenever the viewport size changes — instantly, so the page never opens mid-flight.
-  useEffect(() => moveTo(fitTransform(bounds, size), { instant: true }), [bounds, size, moveTo])
-
-  // Only a new request moves the camera, not a resize: the latest size and positions are read through a ref.
-  const latest = useRef({ positions, size, moveTo })
+  // The latest values for effects that must not re-run on them (declared first, so it's current below).
+  const latest = useRef({ positions, size, moveTo, t })
+  const previousSize = useRef(size)
   useEffect(() => {
-    latest.current = { positions, size, moveTo }
+    latest.current = { positions, size, moveTo, t }
   })
+
+  // On load and resize: refit while the user hasn't moved the camera; otherwise keep their centre and zoom.
+  // Instant either way, so the page never opens mid-flight. (Clicks never move the camera.)
+  useEffect(() => {
+    const from = previousSize.current
+    previousSize.current = size
+    const target = fitted.current ? fitTransform(bounds, size) : keepCentre(latest.current.t, from, size)
+    moveTo(target, { instant: true })
+  }, [bounds, size, moveTo])
   useEffect(() => {
     if (!cameraTarget) return
     const { positions: at, size: viewport, moveTo: move } = latest.current
     const p = at.get(cameraTarget.id)
-    if (p) move(centerOn(p, viewport, SEARCH_SCALE))
+    if (!p) return
+    fitted.current = false
+    move(centerOn(p, viewport, SEARCH_SCALE))
   }, [cameraTarget])
 
   const focusNode = (id: number) => {
-    elements.current.get(id)?.focus()
+    // No page scroll: the node's box may be outside the clipped SVG; the camera pan below brings it into view.
+    elements.current.get(id)?.focus({ preventScroll: true })
     const p = positions.get(id)
-    if (p && !onScreen(p, t, size, FOCUS_MARGIN)) moveTo(centerOn(p, size, t.k))
+    if (p && !onScreen(p, t, size, FOCUS_MARGIN)) {
+      fitted.current = false
+      moveTo(centerOn(p, size, t.k))
+    }
   }
 
   const onNodeKey = (id: number) => (event: KeyboardEvent<SVGGElement>) => {
@@ -102,6 +126,8 @@ export function GraphView({ ids, positions, edges, visuals, titleOf, selected, o
   }
 
   const onMapKey = (event: KeyboardEvent<HTMLDivElement>) => {
+    // Keys count as activity for held visuals (the spread panelProps.onKeyDown is replaced by this handler).
+    panelProps.onKeyDown?.(event)
     if (event.key === '+' || event.key === '=') zoomBy(ZOOM_STEP)
     else if (event.key === '-') zoomBy(1 / ZOOM_STEP)
     else if (event.key === '0') fit()
@@ -138,7 +164,7 @@ export function GraphView({ ids, positions, edges, visuals, titleOf, selected, o
                   y1={a.y}
                   x2={b.x}
                   y2={b.y}
-                  strokeWidth={px(1 + 3 * e.similarity)}
+                  strokeWidth={1 + 3 * e.similarity}
                   opacity={e.opacity}
                 />
               )

@@ -14,7 +14,7 @@ const positions = new Map([
   [4, { x: 500, y: 500 }],
 ])
 
-function renderMap(onActivate = vi.fn()) {
+function renderMap(onActivate = vi.fn(), panelProps = {}) {
   const view = render(
     <GraphView
       ids={[1, 2, 3, 4]}
@@ -27,7 +27,7 @@ function renderMap(onActivate = vi.fn()) {
       titleOf={(id) => titles[id]}
       selected={1}
       onActivate={onActivate}
-      panelProps={{}}
+      panelProps={panelProps}
       animate={false}
       cameraTarget={null}
     />,
@@ -81,5 +81,26 @@ describe('GraphView (map)', () => {
     expect(screen.getByRole('button', { name: 'Zoom in' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Zoom out' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Fit map' })).toBeTruthy()
+  })
+
+  it('draws edge widths in screen pixels once (non-scaling stroke), not divided by the zoom again', () => {
+    const { container } = renderMap()
+    const widths = [...container.querySelectorAll('line.edge')].map((l) => l.getAttribute('stroke-width'))
+    expect(widths).toEqual(['3.4000000000000004', '2.8'])
+  })
+
+  it('moves focus without scrolling the page (the camera brings the node into view)', () => {
+    const { node } = renderMap()
+    act(() => node('Moon').focus())
+    const focus = vi.spyOn(node('Tide'), 'focus')
+    fireEvent.keyDown(node('Moon'), { key: 'ArrowRight' })
+    expect(focus).toHaveBeenCalledWith({ preventScroll: true })
+  })
+
+  it('counts keys on the map as activity for held visuals', () => {
+    const onKeyDown = vi.fn()
+    const { node } = renderMap(vi.fn(), { onKeyDown })
+    fireEvent.keyDown(node('Moon'), { key: 'ArrowRight' })
+    expect(onKeyDown).toHaveBeenCalled()
   })
 })

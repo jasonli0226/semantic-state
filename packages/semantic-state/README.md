@@ -104,11 +104,29 @@ Spread `panelProps` on the list: pointer and keyboard activity inside it holds t
 
 **Store:** `upsert(items, { vectors? })`, `remove(ids)`, `reset(items)`, `interact(id, kind?)`, `forget(id)`,
 `clearInterests()`, `watch(query)` (ref-counted; hooks do this for you), `setWeights(weights)`, `requestSimilar(id, k)`,
-`onEmbedded` / `onQueryEmbedded`, `dispose()`.
+`onEmbedded` / `onQueryEmbedded`, `dispose()`, plus `subscribe` / `getSnapshot` / `getServerSnapshot` for `useSyncExternalStore`.
 
 **`useSemantic(query, { commit, hysteresis, idleMs })`** returns `beliefs`, `interests`, `pending`, `commit`, `pin`,
 `panelProps`, `status`, `model` (download progress), `rankMs`, `itemCount`, `networkRequests`, `query`, `resultQuery`.
 While a new query is being ranked, the previous results stay on screen (`resultQuery` tells you which).
+
+## Server rendering (Next.js, `renderToString`)
+
+The hooks render on the server with the store's initial snapshot (`status: 'starting'`, no results), and the client
+hydrates from the same snapshot before the worker answers. Workers don't exist on the server, so create the store in
+the browser only — e.g. in an effect or a client-only module — and render the provider once you have it:
+
+```tsx
+'use client'
+const [store, setStore] = useState<SemanticStore<Note> | null>(null)
+useEffect(() => {
+  const s = createSemanticStore<Note>(new Worker(new URL('./search.worker.ts', import.meta.url), { type: 'module' }))
+  setStore(s)
+  return () => s.dispose()
+}, [])
+if (!store) return <Fallback />
+return <SemanticProvider store={store}>{children}</SemanticProvider>
+```
 
 ## Languages and data types
 

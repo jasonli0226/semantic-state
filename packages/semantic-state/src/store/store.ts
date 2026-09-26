@@ -38,6 +38,8 @@ export interface WorkerLike<T> {
 
 export interface SemanticStore<T> {
   getSnapshot(): SemanticSnapshot<T>
+  /** The initial (empty) snapshot, for server rendering and hydration. Never changes. */
+  getServerSnapshot(): SemanticSnapshot<T>
   subscribe(listener: () => void): () => void
   /** Add or update items. Pass `vectors` to skip embedding for items you already have vectors for. */
   upsert(items: readonly T[], options?: { vectors?: readonly (readonly [Id, Vec])[] }): void
@@ -114,6 +116,7 @@ export function createSemanticStore<T>(worker: WorkerLike<T>): SemanticStore<T> 
 
   return {
     getSnapshot: () => snapshot,
+    getServerSnapshot: () => INITIAL,
     subscribe: changes.add,
     upsert: (items, options) => post(options?.vectors ? { type: 'upsert', items, vectors: options.vectors } : { type: 'upsert', items }),
     remove: (ids) => post({ type: 'remove', ids }),

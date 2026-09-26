@@ -71,7 +71,6 @@ personalised list with **a worker file and a hook** instead of an ML service.
 - **Personalisation that must follow the user across devices** — interests live in the browser session.
 - **Search that has to be indexed by Google** — results are computed client-side.
 - **Exact filtering, sorting or anything that must be correct** — keep that in normal state; this layer ranks.
-- **Server-rendered pages** — until [#9](https://github.com/jasonli0226/semantic-state/issues/9) is fixed.
 
 ## Languages and data types
 

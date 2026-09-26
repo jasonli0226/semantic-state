@@ -7,7 +7,6 @@ links to an issue where the details and progress live. Suggestions welcome — o
 
 | Item | Issue |
 |---|---|
-| Hooks throw during server rendering (missing `getServerSnapshot`) | [#9](https://github.com/jasonli0226/semantic-state/issues/9) |
 | CI: typecheck, lint, unit tests and E2E on every PR | [#5](https://github.com/jasonli0226/semantic-state/issues/5) |
 | CI: pack-and-install smoke test for the published package | [#6](https://github.com/jasonli0226/semantic-state/issues/6) |
 | CHANGELOG and release checklist | [#7](https://github.com/jasonli0226/semantic-state/issues/7) |

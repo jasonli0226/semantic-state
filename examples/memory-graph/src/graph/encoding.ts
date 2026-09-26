@@ -18,6 +18,8 @@ export interface Visual {
 
 export const MIN_RADIUS = 8
 export const MAX_RADIUS = 28
+/** Unranked articles: small dots, so the whole map stays readable and ranked ones stand out. */
+export const DOT_RADIUS = 3
 
 export interface NodeSignals {
   readonly belief?: Belief<Article>
@@ -42,7 +44,7 @@ export function encode(id: number, { belief, interestWeight }: NodeSignals, ctx:
     return { radius: MAX_RADIUS, tone: laneTone(ctx.lanes, id), ring: interestWeight, why: `You clicked this · interest weight ${fmt(interestWeight)}, fading with each new click` }
   }
   if (!belief) {
-    return { radius: MIN_RADIUS, tone: 'muted', ring: 0, why: 'Not in the current ranking · shown because it neighbours an article you expanded' }
+    return { radius: DOT_RADIUS, tone: 'muted', ring: 0, why: 'Not in the current ranking' }
   }
   const radius = MIN_RADIUS + (MAX_RADIUS - MIN_RADIUS) * belief.confidence
   const confidence = `Confidence ${fmt(belief.confidence)}`

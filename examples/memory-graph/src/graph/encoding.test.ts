@@ -1,7 +1,7 @@
 import type { Belief, Reason } from 'semantic-state'
 import { describe, expect, it } from 'vitest'
 import type { Article } from '../types.ts'
-import { MAX_RADIUS, MIN_RADIUS, assignLanes, encode, sameVisual } from './encoding.ts'
+import { DOT_RADIUS, MAX_RADIUS, MIN_RADIUS, assignLanes, encode, sameVisual } from './encoding.ts'
 
 const article: Article = { id: 3, title: 'Earth', topic: 'Science', abstract: 'A planet.', url: 'https://en.wikipedia.org/wiki/Earth' }
 const belief = (confidence: number, reason: Reason): Belief<Article> => ({ value: article, confidence, reason, groupExtras: 0, updatedAt: 1 })
@@ -34,12 +34,7 @@ describe('encode', () => {
 
   it('mutes fallback and unranked nodes', () => {
     expect(encode(3, { belief: belief(0, { kind: 'fallback', becauseOf: null }) }, ctx)).toMatchObject({ radius: MIN_RADIUS, tone: 'muted' })
-    expect(encode(3, {}, ctx)).toEqual({
-      radius: MIN_RADIUS,
-      tone: 'muted',
-      ring: 0,
-      why: 'Not in the current ranking · shown because it neighbours an article you expanded',
-    })
+    expect(encode(3, {}, ctx)).toEqual({ radius: DOT_RADIUS, tone: 'muted', ring: 0, why: 'Not in the current ranking' })
   })
 })
 

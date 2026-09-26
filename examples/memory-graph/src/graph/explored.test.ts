@@ -1,11 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { enforceCap, expand, pickSearchSeed, visibleNodes } from './explored.ts'
-
-const neighbours = new Map<number, readonly number[]>([
-  [1, [2, 3]],
-  [2, [1, 4]],
-  [5, [6, 7]],
-])
+import { expand, pickSearchSeed, trail } from './explored.ts'
 
 describe('expand', () => {
   it('appends a new id and never mutates the input', () => {
@@ -20,34 +14,14 @@ describe('expand', () => {
   })
 })
 
-describe('visibleNodes', () => {
-  it('lists expanded ids and their neighbours once, with the expanding node as parent', () => {
-    expect(visibleNodes([1, 2], neighbours)).toEqual([
-      { id: 1, parent: null },
-      { id: 2, parent: 1 },
-      { id: 3, parent: 1 },
-      { id: 4, parent: 2 },
-    ])
+describe('trail', () => {
+  it('keeps the last n expansions, newest last', () => {
+    expect(trail([1, 2, 3, 4, 5, 6, 7], 5)).toEqual([3, 4, 5, 6, 7])
+    expect(trail([1, 2], 5)).toEqual([1, 2])
   })
 
-  it('shows an expanded id before its neighbours have arrived', () => {
-    expect(visibleNodes([9], neighbours)).toEqual([{ id: 9, parent: null }])
-  })
-})
-
-describe('enforceCap', () => {
-  it('collapses the oldest expansions until the graph fits', () => {
-    // [1,2,5] shows 1,2,3,4,5,6,7 = 7 nodes; dropping 1 leaves 2,1,4,5,6,7 = 6.
-    expect(enforceCap([1, 2, 5], neighbours, 6)).toEqual([2, 5])
-  })
-
-  it('returns the same order when it already fits', () => {
-    const order = [1, 2]
-    expect(enforceCap(order, neighbours, 60)).toBe(order)
-  })
-
-  it('always keeps the latest expansion, even if it alone is over the cap', () => {
-    expect(enforceCap([1, 5], neighbours, 2)).toEqual([5])
+  it('re-expanding an article moves it to the front of the trail without duplicating it', () => {
+    expect(trail(expand([1, 2, 3], 2), 5)).toEqual([1, 3, 2])
   })
 })
 

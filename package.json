@@ -11,14 +11,16 @@
   "scripts": {
     "dev:inbox": "npm run dev -w examples/inbox",
     "dev:pokedex": "npm run dev -w examples/pokedex",
-    "build": "npm run build -w examples/inbox -w examples/pokedex",
-    "typecheck": "tsc -p packages/semantic-state && tsc -p examples/inbox && tsc -p examples/pokedex && tsc -p tsconfig.node.json",
+    "dev:graph": "npm run dev -w examples/memory-graph",
+    "build": "npm run build -w examples/inbox -w examples/pokedex -w examples/memory-graph",
+    "typecheck": "tsc -p packages/semantic-state && tsc -p examples/inbox && tsc -p examples/pokedex && tsc -p examples/memory-graph && tsc -p tsconfig.node.json",
     "lint": "oxlint",
     "test": "vitest run",
     "coverage": "vitest run --coverage",
     "e2e": "playwright test",
     "eval:inbox": "npm run eval -w examples/inbox",
     "eval:pokedex": "npm run eval -w examples/pokedex",
+    "eval:graph": "npm run eval -w examples/memory-graph",
     "publish:experimental": "npm publish -w packages/semantic-state --tag experimental",
     "smoke:pack": "node scripts/pack-smoke.mjs",
     "check:multilingual": "node scripts/multilingual-check.mjs"

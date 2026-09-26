@@ -1,67 +1,109 @@
 # Memory graph
 
-Explore ~1000 Wikipedia articles (the [Level 3 vital articles](https://en.wikipedia.org/wiki/Wikipedia:Vital_articles/Level/3))
-on one map. Click an article: related articles light up across the whole map, and its 5 nearest neighbours are
-linked. Your last 5 clicks stay linked as a fading trail. Scroll or pinch to zoom; labels appear as you get closer.
+**What you click becomes a memory, and the memory changes what matters everywhere.** This example puts about 1000
+Wikipedia articles (the [Level 3 vital articles](https://en.wikipedia.org/wiki/Wikipedia:Vital_articles/Level/3))
+on one map. Every click teaches [semantic-state](../../packages/semantic-state) what you're interested in. It
+re-ranks every article by meaning, on your device, with no server and no LLM, and the map lights up the articles
+that are now relevant, even far from where you clicked.
 
 ![Memory graph](../../docs/memory-graph.png)
 
 ```bash
-npm run dev:graph        # from the repo root
-npm run eval:graph       # neighbour quality + baseline timings
+npm install              # from the repo root, once
+npm run dev:graph        # then open the printed localhost URL
 ```
 
-## What you're looking at
+## Try it (1 minute)
 
-Three layers:
+1. **Look.** The map opens on *Moon*, already clicked. Its 5 nearest articles are linked, and related articles across
+   the map glow orange: that's Moon's "interest lane".
+2. **Click a second topic.** In the side panel's *Nearest articles*, click *Earth*, or click any dot. A second colour
+   appears: now two interests rank the map at once, each lighting its own articles.
+3. **Watch it hold still.** Move the pointer over the map right after a click. A "N changes pending" chip appears and
+   sizes stay put while you work. Move away or rest for 2 s and they update.
+4. **Search.** Type `volcanoes and earthquakes` and press Enter. The first search downloads a small model (~23 MB,
+   once), then the camera flies to the best match.
+5. **Zoom in.** Scroll, pinch or use the **+** button. Labels appear as you get closer, and the detail panel explains why any
+   article looks the way it does.
+6. **Reset** clears what the map remembers.
 
-| Layer | Drawn as | Comes from |
+## Reading the map
+
+| You see | It means |
+|---|---|
+| Large dot with a ring | an article you clicked. The ring fades as newer clicks push the interest down. |
+| Dot size | how relevant the article is now, from the ranking's `confidence` (8–28 px). Tiny dots aren't in the top 100. |
+| Dot colour | *which* of your clicks made it relevant: one colour per interest (a "lane"). The neutral colour means it matches your search. Faint means no strong signal. |
+| Lines | the trail: each of your last 5 clicks linked to its 5 nearest articles. Older trails fade. |
+| Position | fixed. Similar articles sit near each other, and clicks never move the map. |
+
+**Glossary.**
+- **Belief:** one ranked article, with a `confidence` and a `reason` (search or interest).
+- **Interest (multi-interest mode):** each click is kept separately, decays as you click more, and gets its own lane,
+  so two unrelated clicks don't average into mush.
+- **Commit policy:** when the ranking is allowed to change what you see.
+
+See the library's [Concepts](../../packages/semantic-state#concepts) for more.
+
+## How it works
+
+```
+build time (committed)                          in the browser
+─────────────────────────────                    ───────────────────────────────────────────────────────
+scripts/build-wiki.ts                            ArticleSource (src/source.ts)
+  Wikipedia API → abstracts                        loads articles + vectors + layout
+  → embeddings (transformers.js)                          │
+  public/wiki/articles.json, vectors.bin                  ▼
+scripts/build-layout.ts                          semantic-state worker (src/memory.worker.ts)
+  5-nearest-neighbour graph → force layout         store.upsert(articles, { vectors })
+  public/wiki/layout.json                          store.interact(id) on every click
+                                                          │
+                                                          ▼
+                                                 hooks → one SVG map (src/ui/GraphView.tsx)
+                                                   useSemantic   → size / colour / ring (every article)
+                                                   useNeighbors  → trail lines (requestSimilar per click)
+                                                   encode()      → the drawing and the "why" text, from one function
+```
+
+A few design choices worth knowing:
+
+- **The map holds still while you work.** The library's commit policy holds a *list's order*, but a map shows
+  *values* (size, colour). So `useHeldVisuals` holds those while the pointer is active over the map. The article you
+  just clicked is always shown fresh. (Library follow-up: [#23](https://github.com/jasonli0226/semantic-state/issues/23).)
+- **Search goes by the text alone.** The worker's ranking blends your query 60/40 with your interests. That's right
+  for "what stands out", but it would let an unrelated click weaken or redirect an explicit search. So the jump
+  target is the article most similar to the query text. Below 0.3 similarity you get "Only weak matches" instead.
+- **Keyboard.** The map is one tab stop. Arrow keys walk the selected article's neighbours, Escape returns, Enter
+  explores, and `+` `-` `0` zoom. *Nearest articles* in the side panel is the same graph without the map.
+- **Topic weight** blends in a one-hot topic vector. At 0 neighbours are pure meaning; at 1 they stay within their
+  topic.
+- **Known limit:** while the model downloads for the first search, clicks wait for it ([#25](https://github.com/jasonli0226/semantic-state/issues/25)).
+
+## Scripts
+
+Run from the repo root.
+
+| Command | What it does | Needs |
 |---|---|---|
-| **Map** | every article at a fixed position; neighbours sit close together | `scripts/build-layout.ts`: a force layout over each article's 5 nearest neighbours, computed once and committed (`public/wiki/layout.json`) |
-| **Trail** | edges from your last 5 clicks to their neighbours, fading with age | `store.requestSimilar(id, 5)` per clicked article (`useNeighbors`) |
-| **Attention** | size, colour, ring on every article | `useSemantic(query)` in multi-interest mode, top 100 |
+| `npm run dev:graph` | dev server | — |
+| `npm run eval:graph` | neighbour quality (10 known pairs), what the E2E search finds, map quality, baseline timings | downloads the model once |
+| `npm run build:data -w examples/memory-graph` | rebuilds `public/wiki/` from the Wikipedia API (cached in `node_modules/.cache/wiki`) | network |
+| `npm run build:layout -w examples/memory-graph` | rebuilds `layout.json` from the data (deterministic) | run after `build:data` |
+| `npm run measure:fps -w examples/memory-graph` | frames per second while panning and zooming | a production build served on port 4175: `npm run build -w examples/memory-graph`, then `npx vite preview --port 4175` in this folder |
+| `npx playwright test --project memory-graph` | the E2E tests | Chrome |
 
-| Visual | Meaning |
-|---|---|
-| Large node with a ring | an article you clicked; the ring fades as the interest decays |
-| Node size | `confidence` of the belief (8–28 px); unranked articles are 3 px dots |
-| Colour | which click made it relevant (one colour per interest lane); dark grey = matches your search; light grey = no strong signal |
-| Edge | nearest-neighbour link; wider = more similar |
+## Baseline
 
-The detail panel prints the same explanation the node is drawn from (`src/graph/encoding.ts`).
+Measured on the prebuilt data (1003 articles), for comparing with runtime loading and IndexedDB caching later ([#26](https://github.com/jasonli0226/semantic-state/issues/26)).
 
-**The graph holds still while you work in it.** The library's commit policy holds a list's *order*; a graph shows
-*values*, so `useHeldVisuals` holds sizes and colours while the pointer is active and applies them when it rests or
-leaves ("N changes pending").
-
-**Search jumps to the best match for the text itself.** The worker's ranking blends the query with your interests
-(60/40), which is right for "what stands out" but would let an unrelated click weaken or redirect an explicit search.
-So the search seed is chosen by query-to-article similarity alone (the worker sends query vectors with
-`emitVectors`); below 0.3 you get "Only weak matches" instead of a jump.
-
-**Keyboard.** The map is one tab stop (the selected article). Arrow keys walk its neighbours, Escape returns,
-Enter explores, `+` `-` `0` zoom. The detail panel's "Nearest articles" list is the same graph without the map.
-
-**Topic weight** blends a one-hot topic vector into similarity: at 0 neighbours are pure meaning, at 1 they stay
-within their topic.
-
-## Data
-
-`public/wiki/` is built by `npm run build:data -w examples/memory-graph && npm run build:layout -w examples/memory-graph` from the MediaWiki API and committed.
-Vectors are computed at build time, so the page loads no model until you search.
-
-Loading goes through `ArticleSource` (`src/source.ts`), and vectors reach the worker with
-`store.upsert(articles, { vectors })`. Only the prebuilt source exists today; a live Wikipedia source (the worker
-embeds on load) plus IndexedDB caching is a planned follow-up, measured against this baseline:
-
-| Baseline (prebuilt, local dev server) | |
-|---|---|
-| Articles + vectors fetched and decoded in the browser | 25 ms |
-| Ranking all 1003 articles in the worker (`rankMs`) | 8.7 ms |
-| Neighbours of one article (`eval:graph`, median) | 1.9 ms |
-| Neighbour quality (`eval:graph`) | 10/10 sources have an expected article in their top 5 |
-| Map quality (`eval:graph`) | 99.2 % of neighbour edges shorter than the median random pair |
-| Pan and zoom, production build (`measure:fps`) | 60 fps |
+| Measure | Where | Value |
+|---|---|---|
+| Articles + vectors + layout fetched and decoded | dev server (footer) | ~25 ms |
+| Ranking all articles in the worker (`rankMs`) | dev server (footer) | ~3–9 ms |
+| Neighbours of one article, median | `eval:graph` (Node) | 1.9 ms |
+| Neighbour quality | `eval:graph` | 10/10 sources have an expected article in their top 5 |
+| Map quality | `eval:graph` | 99.2 % of neighbour links shorter than the median random pair |
+| Pan and zoom | production build (`measure:fps`) | 60 fps |
 
 ## Licence
 

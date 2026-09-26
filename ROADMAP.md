@@ -1,6 +1,6 @@
 # Roadmap
 
-semantic-state is an experimental prerelease (`0.1.0-experimental.0`). This is the direction, not a promise; each item
+semantic-state is an experimental prerelease (`0.1.0-experimental.1`). This is the direction, not a promise; each item
 links to an issue where the details and progress live. Suggestions welcome — open an issue.
 
 ## Now — make 0.1.x usable

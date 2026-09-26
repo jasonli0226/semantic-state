@@ -7,6 +7,8 @@ breaking changes are listed under **Changed** or **Removed**.
 
 ## [Unreleased]
 
+## [0.1.0-experimental.1] - 2026-09-27
+
 ### Added
 
 - `SemanticStore.getServerSnapshot()`: the store's initial snapshot, for server rendering and hydration.
@@ -37,5 +39,6 @@ First published prerelease.
   near-duplicate grouping and the commit planner.
 - Commit policies `onIdle`, `manual` and `live`, with hysteresis.
 
-[Unreleased]: https://github.com/jasonli0226/semantic-state/compare/v0.1.0-experimental.0...HEAD
+[Unreleased]: https://github.com/jasonli0226/semantic-state/compare/v0.1.0-experimental.1...HEAD
+[0.1.0-experimental.1]: https://github.com/jasonli0226/semantic-state/compare/v0.1.0-experimental.0...v0.1.0-experimental.1
 [0.1.0-experimental.0]: https://github.com/jasonli0226/semantic-state/releases/tag/v0.1.0-experimental.0

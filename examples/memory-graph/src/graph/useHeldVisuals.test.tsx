@@ -35,6 +35,13 @@ describe('useHeldVisuals', () => {
     expect(result.current.pending).toBe(0)
   })
 
+  it('settles when the caller passes an equal but new map on every render', () => {
+    const { result, rerender } = renderHook(() => useHeldVisuals(new Map([[1, v(8)]]), IDLE))
+    rerender()
+    expect(result.current.visuals.get(1)?.radius).toBe(8)
+    expect(result.current.pending).toBe(0)
+  })
+
   it('applies held changes as soon as the pointer leaves', () => {
     const { result, rerender } = renderHook(({ fresh }) => useHeldVisuals(fresh, IDLE), { initialProps: { fresh: new Map([[1, v(8)]]) } })
     act(() => result.current.panelProps.onPointerMove())

@@ -29,8 +29,10 @@ export function useHeldVisuals(fresh: Visuals, idleMs: number) {
 
   // Synchronizes with time and pointer activity (refs + timer), which render can't observe.
   useEffect(() => {
+    // Only a new node needs recording (so its look is held from now on). Keying on membership, not map
+    // identity, keeps this from looping when the caller builds an equal map on every render.
     // oxlint-disable-next-line react/set-state-in-effect
-    if (pending === 0) return void (applied !== fresh && setApplied(fresh))
+    if (pending === 0) return void ([...fresh.keys()].some((id) => !applied.has(id)) && setApplied(fresh))
     const quiet = quietFor()
     // oxlint-disable-next-line react/set-state-in-effect
     if (quiet >= idleMs) return setApplied(fresh)
@@ -38,6 +40,16 @@ export function useHeldVisuals(fresh: Visuals, idleMs: number) {
     return () => clearTimeout(timer)
   }, [pending, applied, fresh, idleMs, quietFor, recheck])
 
-  const visuals = useMemo(() => new Map([...fresh].map(([id, visual]) => [id, applied.get(id) ?? visual])), [fresh, applied])
+  // Held look only where the drawing would change; otherwise the fresh visual, so the why-text stays current.
+  const visuals = useMemo(
+    () =>
+      new Map(
+        [...fresh].map(([id, visual]) => {
+          const old = applied.get(id)
+          return [id, old && !sameVisual(old, visual) ? old : visual] as const
+        }),
+      ),
+    [fresh, applied],
+  )
   return { visuals: visuals as Visuals, pending, panelProps }
 }

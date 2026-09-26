@@ -78,9 +78,8 @@ npm run eval:pokedex
 
 The first page load downloads the embedding model (~23 MB) once; the browser caches it.
 
-**Releasing** (maintainers): bump `version` in `packages/semantic-state/package.json`, run `npm run smoke:pack`, then
-`npm run publish:experimental` — it builds, packs and publishes with the `experimental` dist-tag (needs `npm login`
-with 2FA; run it in a normal terminal so npm can wait for the browser approval).
+**Releasing** (maintainers): follow [RELEASING.md](RELEASING.md). Changes are listed in the
+[changelog](packages/semantic-state/CHANGELOG.md).
 
 ## Background
 

@@ -39,6 +39,16 @@ const result = (rows: [Doc, number][], extras: [string, number][] = []): QueryRe
 })
 
 describe('useSemantic', () => {
+  it('returns the same empty interests and beliefs on every render before the first result (#24)', () => {
+    const { wrapper } = setup()
+    const { result: hook, rerender } = renderHook(() => useSemantic<Doc>('cats'), { wrapper })
+    const first = hook.current
+    rerender()
+    expect(hook.current.interests).toEqual([])
+    expect(hook.current.interests).toBe(first.interests)
+    expect(hook.current.beliefs).toBe(first.beliefs)
+  })
+
   it('watches the query while mounted and returns beliefs with the item as value', () => {
     const { sent, emit, wrapper } = setup()
     const { result: hook, unmount } = renderHook(() => useSemantic<Doc>('  cats '), { wrapper })

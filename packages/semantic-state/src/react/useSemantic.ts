@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import type { Belief, CommitPolicy, Id } from '../core/types.ts'
 import { normalizeQuery, similarKey } from '../store/store.ts'
-import type { QueryResult, ResultRow } from '../worker/protocol.ts'
+import type { InterestRow, QueryResult, ResultRow } from '../worker/protocol.ts'
 import { COMMIT_DEFAULTS } from './config.ts'
 import { useSemanticStore } from './storeContext.ts'
 import { useCommitPolicy } from './useCommitPolicy.ts'
@@ -12,6 +12,9 @@ export interface UseSemanticOptions {
   readonly hysteresis?: number
   readonly idleMs?: number
 }
+
+/** Shared so the value is referentially stable before the first result (safe to use in effect/memo deps). */
+const NO_INTERESTS: readonly InterestRow<never>[] = []
 
 interface Shown<T> {
   readonly query: string
@@ -65,7 +68,7 @@ export function useSemantic<T>(query: string, options: UseSemanticOptions = {}) 
     /** The query the shown results belong to — differs from `query` while a new one is being ranked. */
     resultQuery: shown?.query ?? null,
     beliefs,
-    interests: shown?.result.interests ?? [],
+    interests: shown?.result.interests ?? NO_INTERESTS,
     pending: committed.pending,
     commit: committed.commit,
     /** Keep an item in its slot (e.g. while hovered). */

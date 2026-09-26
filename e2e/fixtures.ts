@@ -38,7 +38,7 @@ const writeAtomic = async (path: string, data: string | Buffer) => {
 }
 
 export const test = base.extend({
-  context: async ({ context }, use) => {
+  context: async ({ context }, provide) => {
     await mkdir(CACHE_DIR, { recursive: true })
     await context.route(REMOTE, async (route) => {
       const request = route.request()
@@ -57,7 +57,7 @@ export const test = base.extend({
       }
       return route.fulfill({ response, body })
     })
-    await use(context)
+    await provide(context)
   },
 })
 

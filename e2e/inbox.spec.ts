@@ -1,4 +1,5 @@
-import { type Locator, type Page, expect, test } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
+import { expect, test } from './fixtures.ts'
 
 const SEMANTIC = 'useSemantic("what needs my attention right now")'
 

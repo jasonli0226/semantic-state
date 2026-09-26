@@ -26,7 +26,7 @@ export function useSemantic<T>(query: string, options: UseSemanticOptions = {}) 
   const store = useSemanticStore<T>()
   const normalized = normalizeQuery(query)
   useEffect(() => store.watch(normalized), [store, normalized])
-  const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot)
+  const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getServerSnapshot)
 
   // While a new query is being ranked, keep showing the last results instead of flashing empty.
   const current = snapshot.results[normalized]
@@ -82,7 +82,7 @@ export function useSemantic<T>(query: string, options: UseSemanticOptions = {}) 
 /** Nearest neighbours of one item (outside its group), re-requested when weights change. */
 export function useSimilar<T>(id: Id | null, k = 6): readonly ResultRow<T>[] | null {
   const store = useSemanticStore<T>()
-  const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot)
+  const snapshot = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getServerSnapshot)
   const { status, weights } = snapshot
   useEffect(() => {
     if (id !== null && status === 'ready') store.requestSimilar(id, k)
@@ -93,5 +93,5 @@ export function useSimilar<T>(id: Id | null, k = 6): readonly ResultRow<T>[] | n
 /** The raw store snapshot: status, model state, weights. */
 export function useSemanticSnapshot<T>() {
   const store = useSemanticStore<T>()
-  return useSyncExternalStore(store.subscribe, store.getSnapshot)
+  return useSyncExternalStore(store.subscribe, store.getSnapshot, store.getServerSnapshot)
 }

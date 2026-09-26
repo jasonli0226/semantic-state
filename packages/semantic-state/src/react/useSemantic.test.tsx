@@ -1,5 +1,6 @@
 import { act, renderHook } from '@testing-library/react'
 import type { ReactNode } from 'react'
+import { renderToString } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 import { type WorkerLike, createSemanticStore } from '../store/store.ts'
 import type { FromWorker, QueryResult, ToWorker } from '../worker/protocol.ts'
@@ -105,5 +106,30 @@ describe('SemanticProvider', () => {
   it('throws a helpful error when a hook is used outside it', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     expect(() => renderHook(() => useSemantic('x'))).toThrow(/SemanticProvider/)
+  })
+})
+
+describe('server rendering', () => {
+  it('renders every hook with the initial snapshot instead of throwing', () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { store } = setup()
+    function List() {
+      const { status, beliefs } = useSemantic<Doc>('cats')
+      const similar = useSimilar<Doc>('a')
+      const snapshot = useSemanticSnapshot<Doc>()
+      return <p>{`${status}/${beliefs.length}/${similar === null}/${snapshot.model.status}`}</p>
+    }
+    const html = renderToString(<SemanticProvider store={store}><List /></SemanticProvider>)
+    expect(html).toBe('<p>starting/0/true/idle</p>')
+    expect(error).not.toHaveBeenCalled()
+    error.mockRestore()
+  })
+
+  it('serves the initial snapshot on the server even after the store has updated', () => {
+    const { store, emit } = setup()
+    emit({ type: 'ready', weights: { text: 1 } })
+    expect(store.getSnapshot().status).toBe('ready')
+    expect(store.getServerSnapshot()).toMatchObject({ status: 'starting', results: {}, weights: {} })
+    expect(store.getServerSnapshot()).toBe(store.getServerSnapshot())
   })
 })

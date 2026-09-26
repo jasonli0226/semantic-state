@@ -51,7 +51,7 @@ Then write a worker file, create a store and use the hooks — see the
 
 ## Roadmap
 
-What's next — CI, server-rendering support, persistence, larger collections — is in [ROADMAP.md](ROADMAP.md), with one
+What's next — CI, persistence, larger collections — is in [ROADMAP.md](ROADMAP.md), with one
 issue per item.
 
 ## Repo layout

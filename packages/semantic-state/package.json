@@ -58,6 +58,7 @@
     "!src/**/*.test.ts",
     "!src/**/*.test.tsx",
     "README.md",
+    "CHANGELOG.md",
     "LICENSE"
   ],
   "scripts": {

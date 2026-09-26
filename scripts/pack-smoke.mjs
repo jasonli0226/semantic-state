@@ -1,7 +1,7 @@
 /**
  * Pack-and-install smoke test for the published package (issue #6).
  * Packs packages/semantic-state, installs the tarball into a scratch app outside the repo, then checks:
- *   1. the tarball holds every file its `exports` map points at, and no tests
+ *   1. the tarball holds every file its `exports` map points at, no tests, and a changelog entry for its version
  *   2. plain Node ESM can import every entry point
  *   3. strict tsc accepts the .d.ts files (skipLibCheck: false) with moduleResolution bundler and nodenext
  *   4. Vite builds an app that uses the library from a module worker
@@ -36,13 +36,15 @@ function checkTarballContents(info) {
   const files = new Set(info.files.map((f) => f.path))
   const pkg = JSON.parse(readFileSync(join(pkgDir, 'package.json'), 'utf8'))
   const targets = Object.values(pkg.exports).flatMap((conditions) => Object.values(conditions)).map((p) => p.replace(/^\.\//, ''))
+  const hasChangelogEntry = readFileSync(join(pkgDir, 'CHANGELOG.md'), 'utf8').includes(`## [${pkg.version}]`)
   const problems = [
     ...targets.filter((t) => !files.has(t)).map((t) => `exports target not in tarball: ${t}`),
     ...[...files].filter((f) => /\.test\.tsx?$/.test(f)).map((f) => `test file shipped: ${f}`),
-    ...['README.md', 'LICENSE', 'package.json'].filter((f) => !files.has(f)).map((f) => `missing: ${f}`),
+    ...['README.md', 'CHANGELOG.md', 'LICENSE', 'package.json'].filter((f) => !files.has(f)).map((f) => `missing: ${f}`),
+    ...(hasChangelogEntry ? [] : [`CHANGELOG.md has no "## [${pkg.version}]" heading`]),
   ]
   if (problems.length > 0) throw new Error(problems.join('\n'))
-  console.log(`  ok  ${files.size} files, ${targets.length} exports targets present`)
+  console.log(`  ok  ${files.size} files, ${targets.length} exports targets present, changelog has ${pkg.version}`)
 }
 
 function scaffoldApp(tarball) {

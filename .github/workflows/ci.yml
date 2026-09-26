@@ -29,6 +29,20 @@ jobs:
       - run: npm run lint
       - run: npm test
 
+  pack:
+    name: Pack-and-install smoke test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # Packs the library, installs the tarball into a scratch app, then Node import, strict tsc and a Vite worker build.
+      - run: npm run smoke:pack
+
   e2e:
     name: E2E (Playwright, Chrome)
     runs-on: ubuntu-latest

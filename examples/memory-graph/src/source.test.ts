@@ -18,30 +18,45 @@ const fakeFetch = (files: Files) =>
   }) as typeof fetch
 
 const vectors = new Float32Array([1, 0, 0, 1]).buffer
+const base: Files = {
+  'articles.json': articles,
+  'meta.json': { ids: [1, 2], dims: 2 },
+  'vectors.bin': vectors,
+  'layout.json': { ids: [1, 2], x: [-10, 10], y: [0, 5.5] },
+}
+const load = (overrides: Files) => prebuiltSource('/wiki/', fakeFetch({ ...base, ...overrides })).load()
 
 describe('prebuiltSource', () => {
-  it('loads articles and pairs each with its vector', async () => {
-    const loaded = await prebuiltSource('/wiki/', fakeFetch({ 'articles.json': articles, 'meta.json': { ids: [1, 2], dims: 2 }, 'vectors.bin': vectors })).load()
+  it('loads articles with their vector and map position', async () => {
+    const loaded = await load({})
     expect(loaded.articles.map((a) => a.title)).toEqual(['Moon', 'Sun'])
     expect(loaded.vectors?.map(([id, v]) => [id, [...v]])).toEqual([[1, [1, 0]], [2, [0, 1]]])
+    expect(loaded.positions).toEqual(new Map([[1, { x: -10, y: 0 }], [2, { x: 10, y: 5.5 }]]))
   })
 
   it('names the file that failed to load', async () => {
-    await expect(prebuiltSource('/wiki/', fakeFetch({ 'articles.json': articles, 'meta.json': { ids: [1, 2], dims: 2 } })).load()).rejects.toThrow('Could not load vectors.bin (HTTP 404)')
+    await expect(load({ 'vectors.bin': undefined })).rejects.toThrow('Could not load vectors.bin (HTTP 404)')
+    await expect(load({ 'layout.json': undefined })).rejects.toThrow('Could not load layout.json (HTTP 404)')
   })
 
   it('rejects articles without a vector', async () => {
-    const files = { 'articles.json': articles, 'meta.json': { ids: [1], dims: 4 }, 'vectors.bin': vectors }
-    await expect(prebuiltSource('/wiki/', fakeFetch(files)).load()).rejects.toThrow('vectors.bin has no vector for 1 articles (e.g. Sun)')
+    await expect(load({ 'meta.json': { ids: [1], dims: 4 } })).rejects.toThrow('vectors.bin has no vector for 1 articles (e.g. Sun)')
   })
 
   it('rejects a vector file of the wrong size', async () => {
-    const files = { 'articles.json': articles, 'meta.json': { ids: [1, 2], dims: 3 }, 'vectors.bin': vectors }
-    await expect(prebuiltSource('/wiki/', fakeFetch(files)).load()).rejects.toThrow('Invalid vector file: expected 24 bytes, got 16')
+    await expect(load({ 'meta.json': { ids: [1, 2], dims: 3 } })).rejects.toThrow('Invalid vector file: expected 24 bytes, got 16')
   })
 
   it('rejects malformed meta.json', async () => {
-    const files = { 'articles.json': articles, 'meta.json': { ids: 'nope' }, 'vectors.bin': vectors }
-    await expect(prebuiltSource('/wiki/', fakeFetch(files)).load()).rejects.toThrow(/Invalid meta\.json/)
+    await expect(load({ 'meta.json': { ids: 'nope' } })).rejects.toThrow(/Invalid meta\.json/)
+  })
+
+  it('rejects malformed layout.json', async () => {
+    await expect(load({ 'layout.json': { ids: [1, 2], x: [0], y: [0, 0] } })).rejects.toThrow(/Invalid layout\.json/)
+    await expect(load({ 'layout.json': { ids: [1, 2], x: [0, 'a'], y: [0, 0] } })).rejects.toThrow(/Invalid layout\.json/)
+  })
+
+  it('rejects articles without a position (layout from an older build)', async () => {
+    await expect(load({ 'layout.json': { ids: [1, 3], x: [0, 1], y: [0, 1] } })).rejects.toThrow('layout.json has no position for 1 articles (e.g. Sun)')
   })
 })

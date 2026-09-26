@@ -7,12 +7,10 @@
  */
 import { readFile } from 'node:fs/promises'
 import { pipeline } from '@huggingface/transformers'
-import { type FeatureVectors, type Id, dot, similarTo } from 'semantic-state/core'
-import { decodeVectorFile } from 'semantic-state/worker'
+import { type Id, dot, similarTo } from 'semantic-state/core'
 import { EMBEDDING_MODEL, K } from '../src/config.ts'
-import { parseArticles } from '../src/data.ts'
-import { wikiFeatures } from '../src/features.ts'
 import { DEFAULT_WEIGHTS } from '../src/types.ts'
+import { loadPrebuilt } from './load-prebuilt.ts'
 
 const PAIRS: readonly (readonly [string, readonly string[]])[] = [
   ['Moon', ['Earth', 'Sun', 'Solar System']],
@@ -31,14 +29,9 @@ const MIN_HITS = 8
 const E2E_QUERY = 'playing the guitar in a band'
 
 const started = performance.now()
-const articles = parseArticles(JSON.parse(await readFile('public/wiki/articles.json', 'utf8')))
-const meta = JSON.parse(await readFile('public/wiki/meta.json', 'utf8'))
-const bin = await readFile('public/wiki/vectors.bin')
-const text = decodeVectorFile(bin.buffer.slice(bin.byteOffset, bin.byteOffset + bin.byteLength), meta)
+const { articles, text, features } = await loadPrebuilt()
 const loadMs = performance.now() - started
 
-const extra = wikiFeatures(articles)
-const features = new Map<Id, FeatureVectors>(articles.map((a) => [a.id, { ...extra.get(a.id), text: text.get(a.id)! }]))
 const byTitle = new Map(articles.map((a) => [a.title, a]))
 const byId = new Map(articles.map((a) => [a.id, a]))
 const input = { items: articles, idOf: (a: (typeof articles)[number]) => a.id, features: (id: Id) => features.get(id), weights: DEFAULT_WEIGHTS }
@@ -66,4 +59,17 @@ console.log(ranked.map(([title, sim]) => `  ${title} (${sim.toFixed(3)})`).join(
 const median = [...neighbourMs].sort((a, b) => a - b)[Math.floor(neighbourMs.length / 2)]
 console.log(`\n3. Baseline: load + decode ${loadMs.toFixed(0)} ms · neighbours median ${median.toFixed(2)} ms over ${articles.length} articles`)
 
-if (hits < MIN_HITS) process.exitCode = 1
+console.log('\n4. Map quality')
+const layout = JSON.parse(await readFile('public/wiki/layout.json', 'utf8')) as { ids: number[]; x: number[]; y: number[] }
+const pos = new Map(layout.ids.map((id, i) => [id, { x: layout.x[i], y: layout.y[i] }]))
+const dist = (a: number, b: number) => Math.hypot(pos.get(a)!.x - pos.get(b)!.x, pos.get(a)!.y - pos.get(b)!.y)
+let seed = 42
+const random = () => (seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296
+const ids = articles.map((a) => a.id)
+const randomPairs = Array.from({ length: 1000 }, () => dist(ids[Math.floor(random() * ids.length)], ids[Math.floor(random() * ids.length)])).sort((a, b) => a - b)
+const medianRandom = randomPairs[500]
+const neighbourLengths = articles.flatMap((a) => similarTo(a.id, input, K).map((s) => dist(a.id, Number(s.id))))
+const short = neighbourLengths.filter((d) => d < medianRandom).length / neighbourLengths.length
+console.log(`  ${(short * 100).toFixed(1)} % of neighbour edges are shorter than the median random pair (${medianRandom.toFixed(0)}); need 90 %`)
+
+if (hits < MIN_HITS || short < 0.9) process.exitCode = 1

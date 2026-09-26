@@ -8,12 +8,11 @@ interface Props {
   readonly topicWeight: number
   readonly onTopicWeight: (weight: number) => void
   readonly pending: number
-  readonly nodeCount: number
-  readonly capped: boolean
+  readonly summary: string
   readonly onReset: () => void
 }
 
-export function Controls({ onSearch, searchDisabledReason, modelNote, hint, topicWeight, onTopicWeight, pending, nodeCount, capped, onReset }: Props) {
+export function Controls({ onSearch, searchDisabledReason, modelNote, hint, topicWeight, onTopicWeight, pending, summary, onReset }: Props) {
   const [text, setText] = useState('')
   const submit = (event: FormEvent) => {
     event.preventDefault()
@@ -39,7 +38,7 @@ export function Controls({ onSearch, searchDisabledReason, modelNote, hint, topi
         <input type="range" min={0} max={1} step={0.1} value={topicWeight} onChange={(e) => onTopicWeight(Number(e.target.value))} style={{ width: '100%' }} />
       </label>
       <p className="note">
-        {nodeCount} nodes{capped ? ' · oldest faded out' : ''} {pending > 0 && <span className="chip">{pending} {pending === 1 ? 'change' : 'changes'} pending</span>}
+        {summary} {pending > 0 && <span className="chip">{pending} {pending === 1 ? 'change' : 'changes'} pending</span>}
       </p>
       <button type="button" onClick={onReset}>
         Reset

@@ -83,3 +83,6 @@ body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 syst
   .app { grid-template-columns: 1fr; }
   .side { border-left: 0; border-top: 1px solid var(--line); }
 }
+.detail h3 { margin: 1rem 0 0.25rem; font-size: 0.95rem; }
+.neighbours { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.25rem; }
+.neighbours button { width: 100%; text-align: left; font: inherit; padding: 0.25rem 0.5rem; }

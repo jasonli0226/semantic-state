@@ -50,9 +50,15 @@ body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 syst
 .edge { stroke: var(--edge); }
 .edge.hot { stroke: var(--edge-hot); }
 .node { cursor: pointer; outline: none; }
-.node .dot { stroke: var(--panel); stroke-width: 1.5; transition: r 300ms ease, fill 300ms ease; }
-.node .ring { fill: none; stroke: currentColor; stroke-width: 2.5; transition: opacity 300ms ease; }
-.node text { fill: var(--text); font-size: 11px; text-anchor: middle; pointer-events: none; paint-order: stroke; stroke: var(--bg); stroke-width: 3px; }
+.node .dot { stroke: var(--panel); stroke-width: 1; vector-effect: non-scaling-stroke; transition: r 300ms ease, fill 300ms ease; }
+.world.zooming .node .dot, .world.zooming .node .ring { transition: none; }
+.edge, .node .ring { vector-effect: non-scaling-stroke; }
+.zoom-controls { position: absolute; top: 0.75rem; left: 0.75rem; display: flex; gap: 0.25rem; z-index: 1; }
+.zoom-controls button { min-width: 2rem; padding: 0.2rem 0.5rem; font: inherit; }
+.graph svg { cursor: grab; touch-action: none; }
+.graph svg:active { cursor: grabbing; }
+.node .ring { fill: none; stroke: currentColor; stroke-width: 2.5px; transition: opacity 300ms ease; }
+.node text { fill: var(--text); text-anchor: middle; pointer-events: none; paint-order: stroke; stroke: var(--bg); stroke-width: 3px; vector-effect: non-scaling-stroke; }
 .node.selected .dot { stroke: var(--text); stroke-width: 2.5; }
 .node:focus-visible .dot { stroke: var(--text); stroke-width: 3; stroke-dasharray: 4 3; }
 .tone-search { color: var(--search); } .tone-search .dot { fill: var(--search); }

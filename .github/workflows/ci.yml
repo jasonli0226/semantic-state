@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Typecheck, lint, unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+
+  e2e:
+    name: E2E (Playwright, Chrome)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # playwright.config.ts uses the `chrome` channel, which the GitHub Ubuntu runner ships with.
+      - run: google-chrome --version
+      # The embedding model and onnxruntime wasm, replayed by e2e/fixtures.ts. Restored after `npm ci`,
+      # which would otherwise delete node_modules/.cache.
+      - uses: actions/cache@v4
+        with:
+          path: node_modules/.cache/e2e-net
+          key: e2e-net-${{ hashFiles('package-lock.json', 'examples/*/src/**/*.worker.ts') }}
+          restore-keys: e2e-net-
+      - run: npm run e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-results
+          path: test-results
+          retention-days: 7

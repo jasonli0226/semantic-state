@@ -1,4 +1,5 @@
-import { type Page, expect, test } from '@playwright/test'
+import type { Page } from '@playwright/test'
+import { expect, test } from './fixtures.ts'
 
 const ranked = (page: Page) => page.getByRole('region', { name: 'Ranked for you' })
 const rankedNames = (page: Page, n = 15) =>

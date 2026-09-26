@@ -71,13 +71,14 @@ npm run dev:inbox          # or dev:pokedex
 npm test                   # library + example unit tests (vitest)
 npm run typecheck && npm run lint
 npm run e2e                # Playwright against system Chrome, both examples
+npm run smoke:pack         # pack the library, install the tarball in a scratch app, import/tsc/Vite-build it
 npm run eval:inbox         # headless evals with real embeddings
 npm run eval:pokedex
 ```
 
 The first page load downloads the embedding model (~23 MB) once; the browser caches it.
 
-**Releasing** (maintainers): bump `version` in `packages/semantic-state/package.json`, then
+**Releasing** (maintainers): bump `version` in `packages/semantic-state/package.json`, run `npm run smoke:pack`, then
 `npm run publish:experimental` — it builds, packs and publishes with the `experimental` dist-tag (needs `npm login`
 with 2FA; run it in a normal terminal so npm can wait for the browser approval).
 

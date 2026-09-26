@@ -20,6 +20,7 @@
     "eval:inbox": "npm run eval -w examples/inbox",
     "eval:pokedex": "npm run eval -w examples/pokedex",
     "publish:experimental": "npm publish -w packages/semantic-state --tag experimental",
+    "smoke:pack": "node scripts/pack-smoke.mjs",
     "check:multilingual": "node scripts/multilingual-check.mjs"
   },
   "devDependencies": {

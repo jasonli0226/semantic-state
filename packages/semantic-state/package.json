@@ -1,6 +1,6 @@
 {
   "name": "semantic-state",
-  "version": "0.1.0-experimental.0",
+  "version": "0.1.0-experimental.1",
   "description": "Experimental React library: rank state by meaning, on-device. useSemantic() hooks, Web Worker embeddings, and a commit policy that keeps lists still while you use them.",
   "keywords": [
     "react",

@@ -15,7 +15,7 @@
     "@huggingface/transformers": "^4.3.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "semantic-state": "0.1.0-experimental.0",
+    "semantic-state": "0.1.0-experimental.1",
     "zod": "^4.6.5"
   },
   "devDependencies": {

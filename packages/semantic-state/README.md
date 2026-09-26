@@ -2,7 +2,7 @@
 
 [![npm](https://img.shields.io/npm/v/semantic-state/experimental?label=npm%40experimental)](https://www.npmjs.com/package/semantic-state)
 
-> **Experimental prerelease (`0.1.0-experimental.0`).** APIs will change between versions; pin the exact version.
+> **Experimental prerelease (`0.1.0-experimental.1`).** APIs will change between versions; pin the exact version.
 
 React state that is **ranked by meaning instead of looked up by key**, computed on-device in a Web Worker.
 

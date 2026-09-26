@@ -10,6 +10,7 @@ On a branch (`release/<version>`):
 1. **Bump the version** in `packages/semantic-state/package.json`, e.g. `0.1.0-experimental.1`.
 2. **Update every mention of the old version.** `grep -rn '<old version>' --include='*.md' --include='*.json' . | grep -v node_modules`
    finds them: both READMEs, `ROADMAP.md`, and the `semantic-state` dependency in each `examples/*/package.json`.
+   Leave the historical mentions alone: the dist-tag note below and past `CHANGELOG.md` entries.
    Then run `npm install` so `package-lock.json` picks up the new version.
 3. **Update [`CHANGELOG.md`](packages/semantic-state/CHANGELOG.md)**: rename `[Unreleased]` to
    `[<version>] - <YYYY-MM-DD>`, add a new empty `[Unreleased]` above it, and update the compare links at the bottom.

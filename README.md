@@ -2,7 +2,7 @@
 
 [![npm](https://img.shields.io/npm/v/semantic-state/experimental?label=npm%40experimental)](https://www.npmjs.com/package/semantic-state) [![license](https://img.shields.io/npm/l/semantic-state)](LICENSE)
 
-> **Experimental.** A research project published as a prerelease (`0.1.0-experimental.0`): APIs change without notice,
+> **Experimental.** A research project published as a prerelease (`0.1.0-experimental.1`): APIs change without notice,
 > and the numbers come from small datasets. Not for production.
 
 React state that is **ranked by meaning instead of looked up by key**, computed on-device in a Web Worker.

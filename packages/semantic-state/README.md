@@ -90,6 +90,7 @@ Spread `panelProps` on the list: pointer and keyboard activity inside it holds t
 | **Scorer** | `score(input)` combines `querySim`, `interest`, `history`, `interacted` into `{ score, confidence, reason }` — add deadlines, boosts or penalties here. Default: 60/40 query/interest blend. |
 | **Grouping** | `group: { key: (item) => familyId }` or `group: { duplicates: { threshold } }` folds results; `Belief.groupExtras` says how many were folded. |
 | **Precomputed vectors** | `precomputed: () => fetchVectorFile(vectorsUrl, metaUrl)` — build-time embeddings, so a large static catalogue needs no model until the user types a search. |
+| **Background embedding** | Items without vectors are embedded in batches of `embedBatchSize` (default 32) between other messages: clicks and searches stay responsive, results rank the items embedded so far, and `useSemantic().embedding` reports `{ done, total }`. Until the list is first complete, `useSemantic` shows each partial ranking as it arrives; the commit policy applies after that. |
 | **Commit policy** | `onIdle` (after the pointer rests ~2 s or leaves), `manual` (`pending` counts + `commit()`), `live`. Hysteresis stops tiny score changes from reordering. |
 
 ## API
@@ -107,7 +108,7 @@ Spread `panelProps` on the list: pointer and keyboard activity inside it holds t
 `onEmbedded` / `onQueryEmbedded`, `dispose()`, plus `subscribe` / `getSnapshot` / `getServerSnapshot` for `useSyncExternalStore`.
 
 **`useSemantic(query, { commit, hysteresis, idleMs })`** returns `beliefs`, `interests`, `pending`, `commit`, `pin`,
-`panelProps`, `status`, `model` (download progress), `rankMs`, `itemCount`, `networkRequests`, `query`, `resultQuery`.
+`panelProps`, `status`, `model` (download progress), `embedding` (`{ done, total }` while items embed, else `null`), `rankMs`, `itemCount`, `networkRequests`, `query`, `resultQuery`.
 While a new query is being ranked, the previous results stay on screen (`resultQuery` tells you which).
 
 ## Server rendering (Next.js, `renderToString`)
@@ -141,6 +142,7 @@ More in [docs/use-cases.md](../../docs/use-cases.md).
 ## Limits (v0.1)
 
 - In-memory index only (no IndexedDB persistence); a linear scan is fine to ~10k items.
+- With `interests: { mode: 'centroid' }`, a click on an item that has no vector yet (still embedding) does not move the centroid; wait for `embedding === null` if clicks come early.
 - Confidence is uncalibrated — treat it as a display hint.
 - Small embedding models are weak at near-duplicate detection and negation; tune thresholds per dataset.
 - transformers.js brings a ~27 MB wasm runtime (6.8 MB gzipped) plus the model download (~23 MB for MiniLM).

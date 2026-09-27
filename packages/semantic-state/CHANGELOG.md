@@ -7,6 +7,20 @@ breaking changes are listed under **Changed** or **Removed**.
 
 ## [Unreleased]
 
+### Added
+
+- Background item embedding: items without vectors are embedded in batches (`embedBatchSize`, default 32) and the
+  worker handles other messages between batches. Results rank the items embedded so far, and progress arrives as
+  `embedProgress` → `snapshot.embedding` → `useSemantic().embedding` (`{ done, total } | null`).
+  ([#31](https://github.com/jasonli0226/semantic-state/issues/31))
+
+### Changed
+
+- `upsert` and `reset` no longer hold other messages until every item is embedded, and an upsert that needs
+  embedding is ranked once its first batch is done. With `emitVectors`, `embedded` is posted once per batch.
+- `useSemantic` commits every result live, with no hysteresis, until the first ranking made with every item
+  embedded; the commit policy applies from then on, so the first load never stays on a partial ranking.
+
 ### Fixed
 
 - Clicks, similar-item requests and weight changes no longer wait for a search query's embedding. The worker

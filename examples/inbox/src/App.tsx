@@ -11,8 +11,9 @@ export default function App() {
   const [policy, setPolicy] = useState<CommitPolicy>(COMMIT_DEFAULTS.policy)
   const [showAnswerKey, setShowAnswerKey] = useState(true)
   const settings = useMemo(() => ({ policy, showAnswerKey }), [policy, showAnswerKey])
-  // Ready once the model has embedded the inbox.
-  const ready = useSemanticSnapshot().model.status === 'ready'
+  // Ready once the model has embedded the whole inbox: a click on an item with no vector yet would not move the centroid.
+  const snapshot = useSemanticSnapshot()
+  const ready = snapshot.model.status === 'ready' && snapshot.embedding === null
 
   return (
     <SettingsContext.Provider value={settings}>

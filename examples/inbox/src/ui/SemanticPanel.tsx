@@ -3,6 +3,7 @@ import { useSemantic } from 'semantic-state/react'
 import { useMemo } from 'react'
 import type { Item } from '../core/types.ts'
 import { ATTENTION_QUERY, VISIBLE_ROWS } from '../semantic/config.ts'
+import { EmbeddingBanner } from './EmbeddingBanner.tsx'
 import { Panel } from './Panel.tsx'
 import { PendingBanner } from './PendingBanner.tsx'
 import { useSettings } from './settings.ts'
@@ -56,6 +57,7 @@ export function SemanticPanel() {
       banner={
         <>
           <ModelBanner model={semantic.model} />
+          <EmbeddingBanner embedding={semantic.embedding} />
           <PendingBanner pending={semantic.pending} manual={policy === 'manual'} onCommit={semantic.commit} />
         </>
       }

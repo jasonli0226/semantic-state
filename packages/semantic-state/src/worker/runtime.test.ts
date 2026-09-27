@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { defaultScorer } from '../core/rank.ts'
 import type { Id, Vec } from '../core/types.ts'
 import type { Embedder } from './embedder.ts'
 import type { FromWorker, ToWorker } from './protocol.ts'
@@ -441,6 +442,86 @@ describe('worker runtime', () => {
       for (const [done, total] of progressOf(h)) expect(done).toBeLessThanOrEqual(total)
       const [done, total] = progressOf(h).at(-1)!
       expect(done).toBe(total)
+    })
+
+    it('on a failed batch: reports it, ends progress, re-ranks, keeps earlier vectors, and retries on the next upsert', async () => {
+      let calls = 0
+      const inner = fakeEmbedder()
+      const flaky: Embedder = {
+        async embed(texts, onProgress) {
+          calls++
+          if (calls === 2) throw new Error('offline')
+          return inner.embed(texts, onProgress)
+        },
+      }
+      const h = harness({ embedder: flaky, embedBatchSize: 2, emitVectors: true })
+      await h.send({ type: 'watch', query: '' })
+      const before = resultsFor(h, '').length
+      await h.send({ type: 'upsert', items: sixDocs })
+      expect(h.last('modelError')!.message).toBe('offline')
+      expect(progressOf(h).at(-1)).toEqual([6, 6])
+      expect(resultsFor(h, '').length).toBeGreaterThan(before)
+      const lastIndex = (type: FromWorker<Doc>['type']) => h.out.findLastIndex((m) => m.type === type)
+      expect(lastIndex('results')).toBeGreaterThan(lastIndex('modelError')) // the failure itself re-ranks
+      const embedded = h.out.flatMap((m) => (m.type === 'embedded' ? m.vectors.map(([id]) => id) : []))
+      expect(embedded).toEqual(['f1', 'f2'])
+      await h.send({ type: 'upsert', items: sixDocs })
+      expect(inner.calls.slice(1).flat()).toEqual(['water one', 'water two', 'rock one', 'rock two'])
+    })
+
+    it('re-ranks after the first batch and at the end, but at most every 250 ms in between', async () => {
+      let now = 0
+      const clock = vi.spyOn(performance, 'now').mockImplementation(() => now)
+      try {
+        const h = harness({ embedBatchSize: 1 })
+        await h.send({ type: 'watch', query: '' })
+        const before = resultsFor(h, '').length
+        await h.send({ type: 'upsert', items: sixDocs }) // the clock never moves: batches 2–5 are within the throttle
+        expect(resultsFor(h, '').length - before).toBe(2) // after batch 1, and at the end
+      } finally {
+        clock.mockRestore()
+      }
+    })
+
+    it('does not let clicks mid-job hold back the job’s re-ranks', async () => {
+      let now = 0
+      const clock = vi.spyOn(performance, 'now').mockImplementation(() => now)
+      try {
+        const embedder = steppedEmbedder()
+        const h = harness({ embedder, embedBatchSize: 1 })
+        await h.send({ type: 'watch', query: '' })
+        h.dispatch({ type: 'upsert', items: sixDocs })
+        await vi.waitFor(() => expect(embedder.calls).toHaveLength(1))
+        embedder.release() // batch 1 applies at t=0 and ranks (first batch)
+        await vi.waitFor(() => expect(embedder.calls).toHaveLength(2))
+        now = 300
+        h.dispatch({ type: 'interact', id: 'f1', kind: 'open' }) // a click at t=300 ranks too
+        await vi.waitFor(() => expect(h.last('results')?.result.interests.map((i) => i.id)).toEqual(['f1']))
+        const before = resultsFor(h, '').length
+        embedder.release() // batch 2 applies at t=300: 300 ms since the job last ranked, so it ranks
+        await vi.waitFor(() => expect(embedder.calls).toHaveLength(3))
+        expect(resultsFor(h, '').length).toBe(before + 1)
+      } finally {
+        clock.mockRestore()
+      }
+    })
+
+    it('ends the job when an apply step throws, so a later upsert still gets embedded', async () => {
+      let broken = true
+      const h = harness({
+        embedBatchSize: 2,
+        score: (input) => {
+          if (broken && input.hasVector) throw new Error('bad scorer')
+          return defaultScorer(input)
+        },
+      })
+      await h.send({ type: 'watch', query: '' })
+      await h.send({ type: 'upsert', items: sixDocs }) // idle() must resolve, not spin
+      expect(h.last('error')!.message).toBe('bad scorer')
+      broken = false
+      await h.send({ type: 'upsert', items: [{ id: 'n1', text: 'fire new' }] })
+      expect(h.embedder.calls.at(-1)).toContain('fire new')
+      expect(progressOf(h).at(-1)).toEqual([1, 1])
     })
 
     it('treats an embedBatchSize below 1 or not a number as usable', async () => {

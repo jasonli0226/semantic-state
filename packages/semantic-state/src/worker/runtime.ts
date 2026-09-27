@@ -184,7 +184,11 @@ export function createWorkerRuntime<T>(config: SemanticWorkerConfig<T>, port: Wo
 
   /** Runs inside the queue: store what is still current, then take the next batch or finish. */
   function applyBatch(batch: readonly (readonly [Id, string])[], fresh: readonly Vec[], embedMs: number) {
-    const stored = batch.flatMap(([id], i) => [[id, fresh[i]] as const])
+    // Only if the id is still queued with the same text: an edit, remove or supplied vector mid-batch wins.
+    const stored = batch.flatMap(([id, text], i) => {
+      const item = items.get(id)
+      return pending.has(id) && item !== undefined && config.text(item) === text ? [[id, fresh[i]] as const] : []
+    })
     const storedIds = new Set(stored.map(([id]) => id))
     vectors = new Map([...vectors, ...stored])
     embeddedText = new Map([...embeddedText, ...batch.filter(([id]) => storedIds.has(id))])

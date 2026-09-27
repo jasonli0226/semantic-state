@@ -332,6 +332,117 @@ describe('worker runtime', () => {
       expect(progressOf(h)).toEqual([])
     })
 
+    it('re-embeds an item edited while its batch was in flight, never storing the stale vector', async () => {
+      const embedder = steppedEmbedder()
+      const h = harness({ embedder, embedBatchSize: 6, emitVectors: true })
+      h.dispatch({ type: 'upsert', items: sixDocs })
+      await vi.waitFor(() => expect(embedder.calls).toHaveLength(1))
+      h.dispatch({ type: 'upsert', items: [{ id: 'r1', text: 'water now' }] })
+      embedder.release()
+      await vi.waitFor(() => expect(embedder.calls).toHaveLength(2))
+      expect(embedder.calls[1]).toEqual(['water now'])
+      embedder.release()
+      await h.runtime.idle()
+      const r1 = h.out.flatMap((m) => (m.type === 'embedded' ? m.vectors : [])).filter(([id]) => id === 'r1')
+      expect(r1.map(([, v]) => [...v])).toEqual([[0, 1, 0]]) // only the "water" vector, never the stale "rock" one
+      expect(progressOf(h).at(-1)).toEqual([6, 6])
+    })
+
+    it('stores nothing for an item removed while its batch was in flight', async () => {
+      const embedder = steppedEmbedder()
+      const h = harness({ embedder, embedBatchSize: 6, emitVectors: true })
+      h.dispatch({ type: 'upsert', items: sixDocs })
+      await vi.waitFor(() => expect(embedder.calls).toHaveLength(1))
+      h.dispatch({ type: 'remove', ids: ['w1'] })
+      embedder.release()
+      await h.runtime.idle()
+      const ids = h.out.flatMap((m) => (m.type === 'embedded' ? m.vectors.map(([id]) => id) : []))
+      expect(ids).not.toContain('w1')
+      expect(h.out.filter((m) => m.type === 'error')).toEqual([])
+    })
+
+    it('keeps a vector the app supplied while the same item was being embedded', async () => {
+      const embedder = steppedEmbedder()
+      const h = harness({ embedder, embedBatchSize: 6, emitVectors: true })
+      await h.send({ type: 'watch', query: '' })
+      h.dispatch({ type: 'upsert', items: sixDocs })
+      await vi.waitFor(() => expect(embedder.calls).toHaveLength(1))
+      h.dispatch({ type: 'upsert', items: [sixDocs[4]], vectors: [['r1', new Float32Array([1, 0, 0])]] })
+      embedder.release()
+      await h.runtime.idle()
+      const ids = h.out.flatMap((m) => (m.type === 'embedded' ? m.vectors.map(([id]) => id) : []))
+      expect(ids).not.toContain('r1')
+      h.dispatch({ type: 'interact', id: 'f1', kind: 'open' })
+      await h.runtime.idle()
+      expect(resultsFor(h, '').at(-1)!.result.ranked.map((r) => r.id)).toContain('r1') // ranks by the supplied fire-like vector
+    })
+
+    it('drops queued items a reset leaves out', async () => {
+      const embedder = steppedEmbedder()
+      const h = harness({ embedder, embedBatchSize: 2 })
+      h.dispatch({ type: 'upsert', items: sixDocs })
+      await vi.waitFor(() => expect(embedder.calls).toHaveLength(1))
+      h.dispatch({ type: 'reset', items: sixDocs.slice(0, 2) })
+      embedder.release()
+      await h.runtime.idle()
+      expect(embedder.calls).toEqual([['fire one', 'fire two']])
+    })
+
+    it('adds an upsert made mid-job to the running job', async () => {
+      const embedder = steppedEmbedder()
+      const h = harness({ embedder, embedBatchSize: 2 })
+      h.dispatch({ type: 'upsert', items: sixDocs.slice(0, 2) })
+      await vi.waitFor(() => expect(embedder.calls).toHaveLength(1))
+      h.dispatch({ type: 'upsert', items: sixDocs.slice(2, 4) })
+      embedder.release()
+      await vi.waitFor(() => expect(embedder.calls).toHaveLength(2))
+      embedder.release()
+      await h.runtime.idle()
+      expect(progressOf(h)).toEqual([[0, 2], [2, 4], [4, 4]])
+    })
+
+    it('never leaves an item queued with no job running (upsert between the last embed and its apply step)', async () => {
+      const gate: { finish?: () => void } = {}
+      const inner = fakeEmbedder()
+      const embedder: Embedder = {
+        async embed(texts, onProgress) {
+          const out = await inner.embed(texts, onProgress)
+          if (inner.calls.length === 1) await new Promise<void>((resolve) => (gate.finish = resolve))
+          return out
+        },
+      }
+      const h = harness({ embedder, embedBatchSize: 2 })
+      h.dispatch({ type: 'upsert', items: sixDocs.slice(0, 2) })
+      await vi.waitFor(() => expect(gate.finish).toBeDefined())
+      gate.finish!() // the batch resolves; its apply step is queued behind the upsert dispatched next
+      h.dispatch({ type: 'upsert', items: sixDocs.slice(2, 4) })
+      await h.runtime.idle()
+      expect(inner.calls).toEqual([['fire one', 'fire two'], ['water one', 'water two']])
+      expect(progressOf(h).at(-1)).toEqual([4, 4])
+    })
+
+    it('keeps done <= total through edits, removes and re-adds, and ends every job at done === total', async () => {
+      const embedder = steppedEmbedder()
+      const h = harness({ embedder, embedBatchSize: 2 })
+      h.dispatch({ type: 'upsert', items: sixDocs })
+      await vi.waitFor(() => expect(embedder.calls).toHaveLength(1))
+      h.dispatch({ type: 'upsert', items: [{ id: 'f1', text: 'fire edited' }] })
+      h.dispatch({ type: 'remove', ids: ['w1'] })
+      h.dispatch({ type: 'upsert', items: [sixDocs[2]] }) // w1 back, same text
+      const ended = () => {
+        const all = progressOf(h)
+        return all.length > 1 && all.at(-1)![0] === all.at(-1)![1]
+      }
+      while (!ended()) {
+        embedder.release() // a no-op when no batch is waiting yet
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      }
+      await h.runtime.idle()
+      for (const [done, total] of progressOf(h)) expect(done).toBeLessThanOrEqual(total)
+      const [done, total] = progressOf(h).at(-1)!
+      expect(done).toBe(total)
+    })
+
     it('treats an embedBatchSize below 1 or not a number as usable', async () => {
       for (const embedBatchSize of [0, -3, Number.NaN]) {
         const h = harness({ embedBatchSize })

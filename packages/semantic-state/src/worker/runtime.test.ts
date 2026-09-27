@@ -41,6 +41,21 @@ function gatedEmbedder(): Embedder & { calls: string[][]; open: () => void } {
   }
 }
 
+/** A keyword embedder where every call waits until the test releases it; release() finishes the oldest waiting call. */
+function steppedEmbedder(): Embedder & { calls: string[][]; release: () => void } {
+  const calls: string[][] = []
+  const gates: (() => void)[] = []
+  return {
+    calls,
+    release: () => gates.shift()?.(),
+    async embed(texts) {
+      calls.push([...texts])
+      await new Promise<void>((resolve) => gates.push(resolve))
+      return texts.map(keywordVector)
+    },
+  }
+}
+
 function harness(config: Partial<SemanticWorkerConfig<Doc>> = {}) {
   const out: FromWorker<Doc>[] = []
   let listener: ((e: MessageEvent<ToWorker<Doc>>) => void) | null = null
@@ -72,6 +87,21 @@ const docs: Doc[] = [
   { id: 'c', text: 'water turtle', group: 'g2' },
   { id: 'd', text: 'rock snake', group: 'g3' },
 ]
+
+const sixDocs: Doc[] = [
+  { id: 'f1', text: 'fire one' },
+  { id: 'f2', text: 'fire two' },
+  { id: 'w1', text: 'water one' },
+  { id: 'w2', text: 'water two' },
+  { id: 'r1', text: 'rock one' },
+  { id: 'r2', text: 'rock two' },
+]
+
+const resultsFor = (h: ReturnType<typeof harness>, query: string) =>
+  h.out.filter((m): m is Extract<FromWorker<Doc>, { type: 'results' }> => m.type === 'results' && m.query === query)
+
+const progressOf = (h: ReturnType<typeof harness>) =>
+  h.out.filter((m): m is Extract<FromWorker<Doc>, { type: 'embedProgress' }> => m.type === 'embedProgress').map(({ done, total }) => [done, total])
 
 describe('worker runtime', () => {
   it('announces ready with the initial weights', async () => {
@@ -193,8 +223,6 @@ describe('worker runtime', () => {
 
   describe('while a query waits for the model', () => {
     const precomputed = async () => docs.map((d) => [d.id, keywordVector(d.text)] as const)
-    const resultsFor = (h: ReturnType<typeof harness>, query: string) =>
-      h.out.filter((m): m is Extract<FromWorker<Doc>, { type: 'results' }> => m.type === 'results' && m.query === query)
 
     it('still answers similar-item requests and clicks', async () => {
       const h = harness({ embedder: { embed: () => new Promise<Vec[]>(() => {}) }, precomputed })
@@ -242,6 +270,74 @@ describe('worker runtime', () => {
       await h.runtime.idle()
       expect(embedder.calls).toEqual([['fire']])
       expect(resultsFor(h, 'fire')).toHaveLength(1)
+    })
+  })
+
+  describe('background item embedding', () => {
+    it('embeds in batches and reports progress per batch', async () => {
+      const h = harness({ embedBatchSize: 2 })
+      await h.send({ type: 'upsert', items: sixDocs })
+      expect(h.embedder.calls.map((c) => c.length)).toEqual([2, 2, 2])
+      expect(progressOf(h)).toEqual([[0, 6], [2, 6], [4, 6], [6, 6]])
+    })
+
+    it('ranks the items embedded so far after the first batch', async () => {
+      const embedder = steppedEmbedder()
+      const h = harness({ embedder, embedBatchSize: 2 })
+      await h.send({ type: 'watch', query: '' }) // interest-only query, needs no model
+      h.dispatch({ type: 'upsert', items: sixDocs })
+      await vi.waitFor(() => expect(embedder.calls).toHaveLength(1))
+      h.dispatch({ type: 'interact', id: 'f1', kind: 'open' })
+      embedder.release() // batch 1: f1, f2
+      await vi.waitFor(() => expect(embedder.calls).toHaveLength(2)) // batch 2 started, so batch 1 was applied
+      const { result } = resultsFor(h, '').at(-1)!
+      expect(result.ranked.map((r) => r.id)).toEqual(['f2']) // only embedded items rank; f1 is the interacted one
+      expect(progressOf(h).at(-1)).toEqual([2, 6])
+      embedder.release()
+      await vi.waitFor(() => expect(embedder.calls).toHaveLength(3))
+      embedder.release()
+      await h.runtime.idle()
+      expect(progressOf(h).at(-1)).toEqual([6, 6])
+    })
+
+    it('answers clicks and similar-item requests while a batch is being embedded', async () => {
+      const h = harness({ embedder: { embed: () => new Promise<Vec[]>(() => {}) }, precomputed: async () => [['a', keywordVector('fire lizard')] as const, ['b', keywordVector('fire dragon')] as const] })
+      await h.send({ type: 'upsert', items: docs.slice(0, 2) })
+      await h.send({ type: 'watch', query: '' })
+      h.dispatch({ type: 'upsert', items: sixDocs }) // needs the model, which never answers
+      h.dispatch({ type: 'similar', id: 'a', k: 1 })
+      h.dispatch({ type: 'interact', id: 'b', kind: 'open' })
+      await vi.waitFor(() => expect(h.last('similar')?.results.map((r) => r.id)).toEqual(['b']))
+      await vi.waitFor(() => expect(h.last('results')?.result.interests.map((i) => i.id)).toEqual(['b']))
+    })
+
+    it('does not rank an upsert that queued embedding until its first batch is applied', async () => {
+      const embedder = gatedEmbedder()
+      const h = harness({ embedder })
+      await h.send({ type: 'watch', query: '' })
+      const before = resultsFor(h, '').length
+      h.dispatch({ type: 'upsert', items: sixDocs })
+      await vi.waitFor(() => expect(progressOf(h)).toEqual([[0, 6]]))
+      expect(resultsFor(h, '')).toHaveLength(before)
+      embedder.open()
+      await h.runtime.idle()
+      expect(resultsFor(h, '').length).toBeGreaterThan(before)
+    })
+
+    it('still ranks at once an upsert that needs no embedding', async () => {
+      const h = harness({ precomputed: async () => [['a', keywordVector('fire lizard')] as const] })
+      await h.send({ type: 'watch', query: '' })
+      await h.send({ type: 'upsert', items: [docs[0]] })
+      expect(resultsFor(h, '').at(-1)!.result.itemCount).toBe(1)
+      expect(progressOf(h)).toEqual([])
+    })
+
+    it('treats an embedBatchSize below 1 or not a number as usable', async () => {
+      for (const embedBatchSize of [0, -3, Number.NaN]) {
+        const h = harness({ embedBatchSize })
+        await h.send({ type: 'upsert', items: sixDocs })
+        expect(progressOf(h).at(-1)).toEqual([6, 6])
+      }
     })
   })
 })

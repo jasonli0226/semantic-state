@@ -389,6 +389,16 @@ describe('worker runtime', () => {
       expect(embedder.calls).toEqual([['fire one', 'fire two']])
     })
 
+    it('ranks at once a reset that queues nothing new, so removed items leave the results', async () => {
+      const embedder = steppedEmbedder()
+      const h = harness({ embedder, embedBatchSize: 2 })
+      await h.send({ type: 'watch', query: '' })
+      h.dispatch({ type: 'upsert', items: sixDocs })
+      await vi.waitFor(() => expect(embedder.calls).toHaveLength(1))
+      h.dispatch({ type: 'reset', items: sixDocs.slice(2, 4) }) // w1, w2: already queued, not in the batch in flight
+      await vi.waitFor(() => expect(resultsFor(h, '').at(-1)?.result.itemCount).toBe(2))
+    })
+
     it('adds an upsert made mid-job to the running job', async () => {
       const embedder = steppedEmbedder()
       const h = harness({ embedder, embedBatchSize: 2 })
@@ -518,6 +528,7 @@ describe('worker runtime', () => {
       await h.send({ type: 'watch', query: '' })
       await h.send({ type: 'upsert', items: sixDocs }) // idle() must resolve, not spin
       expect(h.last('error')!.message).toBe('bad scorer')
+      expect(progressOf(h).at(-1)).toEqual([6, 6]) // the broken job's progress ends, so `embedding` clears
       broken = false
       await h.send({ type: 'upsert', items: [{ id: 'n1', text: 'fire new' }] })
       expect(h.embedder.calls.at(-1)).toContain('fire new')

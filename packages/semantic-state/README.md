@@ -90,7 +90,7 @@ Spread `panelProps` on the list: pointer and keyboard activity inside it holds t
 | **Scorer** | `score(input)` combines `querySim`, `interest`, `history`, `interacted` into `{ score, confidence, reason }` — add deadlines, boosts or penalties here. Default: 60/40 query/interest blend. |
 | **Grouping** | `group: { key: (item) => familyId }` or `group: { duplicates: { threshold } }` folds results; `Belief.groupExtras` says how many were folded. |
 | **Precomputed vectors** | `precomputed: () => fetchVectorFile(vectorsUrl, metaUrl)` — build-time embeddings, so a large static catalogue needs no model until the user types a search. |
-| **Background embedding** | Items without vectors are embedded in batches of `embedBatchSize` (default 32) between other messages: clicks and searches stay responsive, results rank the items embedded so far, and `useSemantic().embedding` reports `{ done, total }`. Until the list is first complete, `useSemantic` shows each partial ranking as it arrives; the commit policy applies after that. |
+| **Background embedding** | Items without vectors are embedded in batches of `embedBatchSize` (default 32) between other messages: clicks and searches stay responsive, results rank the items embedded so far, and `useSemantic().embedding` reports `{ done, total }`. While the list first fills, the commit policy still applies (without hysteresis), and the first complete ranking is committed once whatever the policy, so the first load never stays on a partial ranking. |
 | **Commit policy** | `onIdle` (after the pointer rests ~2 s or leaves), `manual` (`pending` counts + `commit()`), `live`. Hysteresis stops tiny score changes from reordering. |
 
 ## API

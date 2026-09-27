@@ -82,19 +82,19 @@ describe('useSemantic', () => {
     expect(hook.current.resultQuery).toBe('cats')
   })
 
-  it('commits every result while the list first fills, then holds under the commit policy', () => {
+  it('keeps the commit policy while the list first fills, then commits the first complete ranking once', () => {
     const { emit, wrapper } = setup()
     const { result: hook } = renderHook(() => useSemantic<Doc>('cats', { commit: 'manual' }), { wrapper })
     const order = () => hook.current.beliefs.map((b) => b.value.id)
     emit({ type: 'embedProgress', done: 0, total: 2 })
     emit({ type: 'results', query: 'cats', result: result([[docA, 0.9], [docB, 0.2]]) })
-    emit({ type: 'results', query: 'cats', result: result([[docA, 0.1], [docB, 0.9]]) }) // partial ranking: still filling
-    expect(order()).toEqual(['b', 'a'])
-    emit({ type: 'embedProgress', done: 2, total: 2 })
-    emit({ type: 'results', query: 'cats', result: result([[docA, 0.9], [docB, 0.1]]) }) // the first complete ranking
+    emit({ type: 'results', query: 'cats', result: result([[docA, 0.1], [docB, 0.9]]) }) // partial ranking: manual holds it
     expect(order()).toEqual(['a', 'b'])
-    emit({ type: 'results', query: 'cats', result: result([[docA, 0.1], [docB, 0.9]]) })
-    expect(order()).toEqual(['a', 'b']) // held from now on
+    emit({ type: 'embedProgress', done: 2, total: 2 })
+    emit({ type: 'results', query: 'cats', result: result([[docA, 0.1], [docB, 0.9]]) }) // the first complete ranking
+    expect(order()).toEqual(['b', 'a'])
+    emit({ type: 'results', query: 'cats', result: result([[docA, 0.9], [docB, 0.1]]) })
+    expect(order()).toEqual(['b', 'a']) // held from now on
     expect(hook.current.pending.movedUp).toBeGreaterThan(0)
   })
 

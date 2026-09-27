@@ -100,7 +100,7 @@ export function createWorkerRuntime<T>(config: SemanticWorkerConfig<T>, port: Wo
     extraFeatures = config.features ? config.features([...items.values()]) : new Map()
   }
 
-  /** Stores items and supplied vectors and queues stale items for the embed job. Returns true if anything is queued. */
+  /** Stores items and supplied vectors and queues stale items for the embed job. Returns true if it queued new ids. */
   function upsert(incoming: readonly T[], supplied: readonly (readonly [Id, Vec])[] = []): boolean {
     const given = new Map(supplied)
     const stale = new Set<Id>()
@@ -131,7 +131,9 @@ export function createWorkerRuntime<T>(config: SemanticWorkerConfig<T>, port: Wo
     pending = new Set([...[...pending].filter((id) => !settled.has(id)), ...added])
     progress = { ...progress, total: progress.total + added.length }
     refreshFeatures()
-    if (stale.size === 0) return false
+    // Stale ids that were already queued need no new batch; the caller ranks the updated items at once.
+    // (No job running means nothing is queued, so new stale ids always land in `added`.)
+    if (added.length === 0) return false
     if (job === null) startJob()
     return true
   }
@@ -168,6 +170,7 @@ export function createWorkerRuntime<T>(config: SemanticWorkerConfig<T>, port: Wo
       try {
         step()
       } catch (error) {
+        post({ type: 'embedProgress', done: progress.total, total: progress.total })
         pending = new Set()
         progress = { done: 0, total: 0 }
         job = null

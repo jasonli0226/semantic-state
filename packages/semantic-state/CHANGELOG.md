@@ -18,8 +18,9 @@ breaking changes are listed under **Changed** or **Removed**.
 
 - `upsert` and `reset` no longer hold other messages until every item is embedded, and an upsert that needs
   embedding is ranked once its first batch is done. With `emitVectors`, `embedded` is posted once per batch.
-- `useSemantic` commits every result live, with no hysteresis, until the first ranking made with every item
-  embedded; the commit policy applies from then on, so the first load never stays on a partial ranking.
+- While items are first being embedded, `useSemantic` applies the commit policy without hysteresis, then commits
+  the first ranking made with every item embedded once, whatever the policy, so the first load never stays on a
+  partial ranking.
 
 ### Fixed
 

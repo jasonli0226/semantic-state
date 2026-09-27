@@ -7,6 +7,12 @@ breaking changes are listed under **Changed** or **Removed**.
 
 ## [Unreleased]
 
+### Fixed
+
+- Clicks, similar-item requests and weight changes no longer wait for a search query's embedding. The worker
+  embeds queries outside its message queue, so a slow or hung model download holds up only that query's results;
+  the query is ranked, in order, once its vector arrives. ([#25](https://github.com/jasonli0226/semantic-state/issues/25))
+
 ## [0.1.0-experimental.1] - 2026-09-27
 
 ### Added

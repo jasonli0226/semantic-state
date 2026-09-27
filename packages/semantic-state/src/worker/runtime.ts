@@ -59,8 +59,10 @@ export function createWorkerRuntime<T>(config: SemanticWorkerConfig<T>, port: Wo
   let extraFeatures: ReadonlyMap<Id, FeatureVectors> = new Map()
   let attention: AttentionState = EMPTY_ATTENTION
   let weights: Weights = config.weights ?? { text: 1 }
-  const queries = new Map<string, Vec | null>()
+  /** 'embedding': the query's vector is on its way (see embedQuery); until then it ranks by interests only. */
+  const queries = new Map<string, Vec | null | 'embedding'>()
   const queryCache = new Map<string, Vec>()
+  const queryEmbeds = new Map<string, Promise<void>>()
   let model: 'idle' | 'ready' = 'idle'
   let requestsAtModelReady = 0
 
@@ -122,20 +124,38 @@ export function createWorkerRuntime<T>(config: SemanticWorkerConfig<T>, port: Wo
     refreshFeatures()
   }
 
-  async function watch(query: string) {
-    if (queries.has(query)) return
-    if (query === '') return void queries.set(query, null)
-    let vector = queryCache.get(query) ?? null
-    if (!vector) {
-      try {
-        ;[vector] = await embed([query])
-        queryCache.set(query, vector)
-        if (config.emitVectors) post({ type: 'queryEmbedded', query, vector })
-      } catch (error) {
-        post({ type: 'modelError', message: errorMessage(error) })
-      }
+  /** Returns true when the query still needs embedding; it is ranked once its vector arrives. */
+  function watch(query: string): boolean {
+    if (queries.has(query)) return false
+    const known = query === '' ? null : queryCache.get(query)
+    if (known !== undefined) {
+      queries.set(query, known)
+      return false
     }
-    queries.set(query, vector)
+    queries.set(query, 'embedding')
+    if (!queryEmbeds.has(query)) queryEmbeds.set(query, embedQuery(query))
+    return true
+  }
+
+  /**
+   * Runs outside the serial queue: the first query may wait on a model download, and clicks,
+   * similar-item requests and weights must not wait with it. The ranking goes back through the queue.
+   */
+  async function embedQuery(query: string) {
+    let vector: Vec | null = null
+    try {
+      ;[vector] = await embed([query])
+      queryCache.set(query, vector)
+      if (config.emitVectors) post({ type: 'queryEmbedded', query, vector })
+    } catch (error) {
+      post({ type: 'modelError', message: errorMessage(error) })
+    }
+    queryEmbeds.delete(query)
+    enqueue(() => {
+      if (queries.get(query) !== 'embedding') return // unwatched meanwhile
+      queries.set(query, vector)
+      rankQuery(query, vector, [...items.values()])
+    })
   }
 
   const groupKey = (id: Id): Id | undefined => {
@@ -156,26 +176,28 @@ export function createWorkerRuntime<T>(config: SemanticWorkerConfig<T>, port: Wo
       return item === undefined ? [] : [{ ...r, item }]
     })
 
+  function rankQuery(query: string, queryVec: Vec | null, all: readonly T[]) {
+    const started = performance.now()
+    const scored = scoreAll({ items: all, idOf: config.id, features: featuresOf, queryVec, attention, interests: config.interests, weights, scorer })
+    const { ranked, extras } = rankForDisplay(scored, { group: grouping(), lanes, limit })
+    post({
+      type: 'results',
+      query,
+      result: {
+        ranked: withItems(ranked),
+        extras: [...extras],
+        interests: attention.interests.map((i) => ({ ...i, item: items.get(i.id) })),
+        rankMs: performance.now() - started,
+        itemCount: all.length,
+        updatedAt: Date.now(),
+        networkRequests: model === 'ready' ? resourceCount() - requestsAtModelReady : null,
+      },
+    })
+  }
+
   function rankAll() {
     const all = [...items.values()]
-    for (const [query, queryVec] of queries) {
-      const started = performance.now()
-      const scored = scoreAll({ items: all, idOf: config.id, features: featuresOf, queryVec, attention, interests: config.interests, weights, scorer })
-      const { ranked, extras } = rankForDisplay(scored, { group: grouping(), lanes, limit })
-      post({
-        type: 'results',
-        query,
-        result: {
-          ranked: withItems(ranked),
-          extras: [...extras],
-          interests: attention.interests.map((i) => ({ ...i, item: items.get(i.id) })),
-          rankMs: performance.now() - started,
-          itemCount: all.length,
-          updatedAt: Date.now(),
-          networkRequests: model === 'ready' ? resourceCount() - requestsAtModelReady : null,
-        },
-      })
-    }
+    for (const [query, queryVec] of queries) rankQuery(query, queryVec === 'embedding' ? null : queryVec, all)
   }
 
   async function handle(message: ToWorker<T>): Promise<void> {
@@ -206,7 +228,7 @@ export function createWorkerRuntime<T>(config: SemanticWorkerConfig<T>, port: Wo
         attention = EMPTY_ATTENTION
         break
       case 'watch':
-        await watch(message.query)
+        if (watch(message.query)) return
         break
       case 'unwatch':
         queries.delete(message.query)
@@ -241,13 +263,21 @@ export function createWorkerRuntime<T>(config: SemanticWorkerConfig<T>, port: Wo
     }
   })()
 
-  port.addEventListener('message', ({ data }) => {
-    queue = queue.then(() => handle(data)).catch((error: unknown) => post({ type: 'error', message: errorMessage(error) }))
-  })
+  function enqueue(task: () => void | Promise<void>) {
+    queue = queue.then(task).catch((error: unknown) => post({ type: 'error', message: errorMessage(error) }))
+  }
+
+  port.addEventListener('message', ({ data }) => enqueue(() => handle(data)))
 
   return {
-    /** Resolves once every queued message has been handled (for tests). */
-    idle: () => queue,
+    /** Resolves once every queued message and query embedding has been handled (for tests). */
+    async idle() {
+      for (;;) {
+        const current = queue
+        await Promise.all([current, ...queryEmbeds.values()])
+        if (current === queue && queryEmbeds.size === 0) return
+      }
+    },
   }
 }
 

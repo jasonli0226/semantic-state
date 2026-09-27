@@ -62,6 +62,16 @@ describe('useSemantic', () => {
     expect(sent.at(-1)).toEqual({ type: 'unwatch', query: 'cats' })
   })
 
+  it('exposes background embedding progress', () => {
+    const { emit, wrapper } = setup()
+    const { result: hook } = renderHook(() => useSemantic<Doc>('cats'), { wrapper })
+    expect(hook.current.embedding).toBeNull()
+    emit({ type: 'embedProgress', done: 32, total: 100 })
+    expect(hook.current.embedding).toEqual({ done: 32, total: 100 })
+    emit({ type: 'embedProgress', done: 100, total: 100 })
+    expect(hook.current.embedding).toBeNull()
+  })
+
   it('keeps showing the previous results while a new query is being ranked', () => {
     const { emit, wrapper } = setup()
     const { result: hook, rerender } = renderHook(({ q }) => useSemantic<Doc>(q), { wrapper, initialProps: { q: 'cats' } })
@@ -70,6 +80,32 @@ describe('useSemantic', () => {
     expect(hook.current.beliefs.map((b) => b.value.id)).toEqual(['a'])
     expect(hook.current.query).toBe('dogs')
     expect(hook.current.resultQuery).toBe('cats')
+  })
+
+  it('keeps the commit policy while the list first fills, then commits the first complete ranking once', () => {
+    const { emit, wrapper } = setup()
+    const { result: hook } = renderHook(() => useSemantic<Doc>('cats', { commit: 'manual' }), { wrapper })
+    const order = () => hook.current.beliefs.map((b) => b.value.id)
+    emit({ type: 'embedProgress', done: 0, total: 2 })
+    emit({ type: 'results', query: 'cats', result: result([[docA, 0.9], [docB, 0.2]]) })
+    emit({ type: 'results', query: 'cats', result: result([[docA, 0.1], [docB, 0.9]]) }) // partial ranking: manual holds it
+    expect(order()).toEqual(['a', 'b'])
+    emit({ type: 'embedProgress', done: 2, total: 2 })
+    emit({ type: 'results', query: 'cats', result: result([[docA, 0.1], [docB, 0.9]]) }) // the first complete ranking
+    expect(order()).toEqual(['b', 'a'])
+    emit({ type: 'results', query: 'cats', result: result([[docA, 0.9], [docB, 0.1]]) })
+    expect(order()).toEqual(['b', 'a']) // held from now on
+    expect(hook.current.pending.movedUp).toBeGreaterThan(0)
+  })
+
+  it('places the first complete ranking by its own scores, not ones held from partial results', () => {
+    const { emit, wrapper } = setup()
+    const { result: hook } = renderHook(() => useSemantic<Doc>('cats', { commit: 'manual', hysteresis: 0.05 }), { wrapper })
+    emit({ type: 'embedProgress', done: 0, total: 2 })
+    emit({ type: 'results', query: 'cats', result: result([[docA, 0.5], [docB, 0.48]]) })
+    emit({ type: 'embedProgress', done: 2, total: 2 })
+    emit({ type: 'results', query: 'cats', result: result([[docA, 0.48], [docB, 0.5]]) }) // within hysteresis of the partial scores
+    expect(hook.current.beliefs.map((b) => b.value.id)).toEqual(['b', 'a'])
   })
 
   it('applies the commit policy (manual holds the order)', () => {

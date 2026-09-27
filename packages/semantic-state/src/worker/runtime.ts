@@ -30,6 +30,8 @@ export interface SemanticWorkerConfig<T> {
   readonly resultLimit?: number
   /** Also post new embeddings to the main thread (for baselines that rank elsewhere). Vectors you supplied are not echoed. */
   readonly emitVectors?: boolean
+  /** Items per embed() call. Between batches the worker handles other messages and re-ranks. Default 32. */
+  readonly embedBatchSize?: number
 }
 
 export interface WorkerPort<T> {
@@ -42,6 +44,9 @@ export interface RuntimeDeps {
 }
 
 const DEFAULT_LIMIT = 40
+const DEFAULT_EMBED_BATCH = 32
+/** During an embed job, re-rank at most this often (the first batch and the end always rank). */
+const RANK_THROTTLE_MS = 250
 const errorMessage = (error: unknown) => (error instanceof Error ? error.message : String(error))
 
 export function createWorkerRuntime<T>(config: SemanticWorkerConfig<T>, port: WorkerPort<T>, deps: RuntimeDeps = {}) {
@@ -50,6 +55,7 @@ export function createWorkerRuntime<T>(config: SemanticWorkerConfig<T>, port: Wo
   const scorer: Scorer<T> = config.score ?? defaultScorer
   const lanes = config.lanes ?? config.interests.mode === 'multi'
   const limit = config.resultLimit ?? DEFAULT_LIMIT
+  const batchSize = Number.isFinite(config.embedBatchSize) ? Math.max(1, Math.floor(config.embedBatchSize!)) : DEFAULT_EMBED_BATCH
 
   let items = new Map<Id, T>()
   let vectors = new Map<Id, Vec>()
@@ -65,6 +71,13 @@ export function createWorkerRuntime<T>(config: SemanticWorkerConfig<T>, port: Wo
   const queryEmbeds = new Map<string, Promise<void>>()
   let model: 'idle' | 'ready' = 'idle'
   let requestsAtModelReady = 0
+  /** Ids whose current text has no vector yet, in the order they were queued. Drained by the embed job. */
+  let pending = new Set<Id>()
+  /** The batch in flight; null when no job is running. Only queued tasks start, continue or end a job. */
+  let job: Promise<void> | null = null
+  let progress = { done: 0, total: 0 }
+  let rankedThisJob = false
+  let lastRankAt = Number.NEGATIVE_INFINITY
 
   const featuresOf = (id: Id): FeatureVectors | undefined => {
     const text = vectors.get(id)
@@ -87,9 +100,11 @@ export function createWorkerRuntime<T>(config: SemanticWorkerConfig<T>, port: Wo
     extraFeatures = config.features ? config.features([...items.values()]) : new Map()
   }
 
-  async function upsert(incoming: readonly T[], supplied: readonly (readonly [Id, Vec])[] = []) {
+  /** Stores items and supplied vectors and queues stale items for the embed job. Returns true if it queued new ids. */
+  function upsert(incoming: readonly T[], supplied: readonly (readonly [Id, Vec])[] = []): boolean {
     const given = new Map(supplied)
-    const stale: T[] = []
+    const stale = new Set<Id>()
+    const settled = new Set<Id>()
     const nextVectors = new Map(vectors)
     const nextText = new Map(embeddedText)
     for (const item of incoming) {
@@ -99,29 +114,111 @@ export function createWorkerRuntime<T>(config: SemanticWorkerConfig<T>, port: Wo
       if (vector) {
         nextVectors.set(id, vector)
         nextText.set(id, text)
+        settled.add(id)
       } else if (precomputedIds.has(id) && !nextText.has(id)) {
         nextText.set(id, text)
+        settled.add(id)
       } else if (nextText.get(id) !== text) {
-        stale.push(item)
+        stale.add(id)
+      } else {
+        settled.add(id)
       }
     }
     items = new Map([...items, ...incoming.map((item) => [config.id(item), item] as const)])
     vectors = nextVectors
     embeddedText = nextText
-
-    if (stale.length > 0) {
-      try {
-        const started = performance.now()
-        const fresh = await embed(stale.map(config.text))
-        const pairs = stale.map((item, i) => [config.id(item), fresh[i]] as const)
-        vectors = new Map([...vectors, ...pairs])
-        embeddedText = new Map([...embeddedText, ...stale.map((item) => [config.id(item), config.text(item)] as const)])
-        if (config.emitVectors) post({ type: 'embedded', vectors: pairs, embedMs: performance.now() - started })
-      } catch (error) {
-        post({ type: 'modelError', message: errorMessage(error) })
-      }
-    }
+    const added = [...stale].filter((id) => !pending.has(id))
+    pending = new Set([...[...pending].filter((id) => !settled.has(id)), ...added])
+    progress = { ...progress, total: progress.total + added.length }
     refreshFeatures()
+    // Stale ids that were already queued need no new batch; the caller ranks the updated items at once.
+    // (No job running means nothing is queued, so new stale ids always land in `added`.)
+    if (added.length === 0) return false
+    if (job === null) startJob()
+    return true
+  }
+
+  function startJob() {
+    rankedThisJob = false
+    post({ type: 'embedProgress', ...progress })
+    job = embedBatch(takeBatch())
+  }
+
+  /** Runs inside the queue. Ids stay in `pending` until their vectors are applied. */
+  function takeBatch(): readonly (readonly [Id, string])[] {
+    return [...pending].slice(0, batchSize).flatMap((id) => {
+      const item = items.get(id)
+      return item === undefined ? [] : [[id, config.text(item)] as const]
+    })
+  }
+
+  /** Embeds outside the queue (the model may still be downloading), then applies the result through it. */
+  async function embedBatch(batch: readonly (readonly [Id, string])[]) {
+    const started = performance.now()
+    try {
+      const fresh = await embed(batch.map(([, text]) => text))
+      const embedMs = performance.now() - started // measured here: time spent waiting in the queue is not embedding
+      enqueueJobStep(() => applyBatch(batch, fresh, embedMs))
+    } catch (error) {
+      enqueueJobStep(() => failJob(error))
+    }
+  }
+
+  /** A job step that throws (e.g. an app-supplied `score` or `features`) ends the job, so later upserts start a new one. */
+  function enqueueJobStep(step: () => void) {
+    enqueue(() => {
+      try {
+        step()
+      } catch (error) {
+        post({ type: 'embedProgress', done: progress.total, total: progress.total })
+        pending = new Set()
+        progress = { done: 0, total: 0 }
+        job = null
+        throw error // enqueue posts it as an `error` message
+      }
+    })
+  }
+
+  /** Ranks for the job and restarts its throttle clock; clicks and other messages don't touch that clock. */
+  function rankForJob() {
+    lastRankAt = performance.now()
+    rankAll()
+  }
+
+  /** Runs inside the queue: store what is still current, then take the next batch or finish. */
+  function applyBatch(batch: readonly (readonly [Id, string])[], fresh: readonly Vec[], embedMs: number) {
+    // Only if the id is still queued with the same text: an edit, remove or supplied vector mid-batch wins.
+    const stored = batch.flatMap(([id, text], i) => {
+      const item = items.get(id)
+      return pending.has(id) && item !== undefined && config.text(item) === text ? [[id, fresh[i]] as const] : []
+    })
+    const storedIds = new Set(stored.map(([id]) => id))
+    vectors = new Map([...vectors, ...stored])
+    embeddedText = new Map([...embeddedText, ...batch.filter(([id]) => storedIds.has(id))])
+    pending = new Set([...pending].filter((id) => !storedIds.has(id)))
+    progress = { ...progress, done: progress.done + stored.length }
+    refreshFeatures()
+    if (config.emitVectors && stored.length > 0) post({ type: 'embedded', vectors: stored, embedMs })
+    if (pending.size === 0) return finishJob()
+    post({ type: 'embedProgress', ...progress })
+    if (!rankedThisJob || performance.now() - lastRankAt >= RANK_THROTTLE_MS) {
+      rankedThisJob = true
+      rankForJob()
+    }
+    job = embedBatch(takeBatch())
+  }
+
+  function finishJob() {
+    post({ type: 'embedProgress', done: progress.total, total: progress.total })
+    progress = { done: 0, total: 0 }
+    job = null
+    rankForJob()
+  }
+
+  function failJob(error: unknown) {
+    post({ type: 'modelError', message: errorMessage(error) })
+    pending = new Set()
+    finishJob()
   }
 
   /** Returns true when the query still needs embedding; it is ranked once its vector arrives. */
@@ -203,11 +300,12 @@ export function createWorkerRuntime<T>(config: SemanticWorkerConfig<T>, port: Wo
   async function handle(message: ToWorker<T>): Promise<void> {
     switch (message.type) {
       case 'upsert':
-        await upsert(message.items, message.vectors)
+        if (upsert(message.items, message.vectors)) return // ranked when its first batch is applied
         break
       case 'remove': {
         const gone = new Set(message.ids)
         items = new Map([...items].filter(([id]) => !gone.has(id)))
+        pending = new Set([...pending].filter((id) => !gone.has(id)))
         refreshFeatures()
         break
       }
@@ -215,7 +313,9 @@ export function createWorkerRuntime<T>(config: SemanticWorkerConfig<T>, port: Wo
         // Vectors stay cached, so re-adding the same items costs no embedding.
         items = new Map()
         attention = EMPTY_ATTENTION
-        await upsert(message.items)
+        const kept = new Set(message.items.map(config.id))
+        pending = new Set([...pending].filter((id) => kept.has(id)))
+        if (upsert(message.items)) return
         break
       }
       case 'interact':
@@ -270,12 +370,12 @@ export function createWorkerRuntime<T>(config: SemanticWorkerConfig<T>, port: Wo
   port.addEventListener('message', ({ data }) => enqueue(() => handle(data)))
 
   return {
-    /** Resolves once every queued message and query embedding has been handled (for tests). */
+    /** Resolves once every queued message, query embedding and the embed job have been handled (for tests). */
     async idle() {
       for (;;) {
         const current = queue
-        await Promise.all([current, ...queryEmbeds.values()])
-        if (current === queue && queryEmbeds.size === 0) return
+        await Promise.all([current, job, ...queryEmbeds.values()])
+        if (current === queue && job === null && queryEmbeds.size === 0) return
       }
     },
   }

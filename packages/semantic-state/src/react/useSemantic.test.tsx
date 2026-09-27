@@ -82,6 +82,32 @@ describe('useSemantic', () => {
     expect(hook.current.resultQuery).toBe('cats')
   })
 
+  it('commits every result while the list first fills, then holds under the commit policy', () => {
+    const { emit, wrapper } = setup()
+    const { result: hook } = renderHook(() => useSemantic<Doc>('cats', { commit: 'manual' }), { wrapper })
+    const order = () => hook.current.beliefs.map((b) => b.value.id)
+    emit({ type: 'embedProgress', done: 0, total: 2 })
+    emit({ type: 'results', query: 'cats', result: result([[docA, 0.9], [docB, 0.2]]) })
+    emit({ type: 'results', query: 'cats', result: result([[docA, 0.1], [docB, 0.9]]) }) // partial ranking: still filling
+    expect(order()).toEqual(['b', 'a'])
+    emit({ type: 'embedProgress', done: 2, total: 2 })
+    emit({ type: 'results', query: 'cats', result: result([[docA, 0.9], [docB, 0.1]]) }) // the first complete ranking
+    expect(order()).toEqual(['a', 'b'])
+    emit({ type: 'results', query: 'cats', result: result([[docA, 0.1], [docB, 0.9]]) })
+    expect(order()).toEqual(['a', 'b']) // held from now on
+    expect(hook.current.pending.movedUp).toBeGreaterThan(0)
+  })
+
+  it('places the first complete ranking by its own scores, not ones held from partial results', () => {
+    const { emit, wrapper } = setup()
+    const { result: hook } = renderHook(() => useSemantic<Doc>('cats', { commit: 'manual', hysteresis: 0.05 }), { wrapper })
+    emit({ type: 'embedProgress', done: 0, total: 2 })
+    emit({ type: 'results', query: 'cats', result: result([[docA, 0.5], [docB, 0.48]]) })
+    emit({ type: 'embedProgress', done: 2, total: 2 })
+    emit({ type: 'results', query: 'cats', result: result([[docA, 0.48], [docB, 0.5]]) }) // within hysteresis of the partial scores
+    expect(hook.current.beliefs.map((b) => b.value.id)).toEqual(['b', 'a'])
+  })
+
   it('applies the commit policy (manual holds the order)', () => {
     const { emit, wrapper } = setup()
     const { result: hook } = renderHook(() => useSemantic<Doc>('cats', { commit: 'manual' }), { wrapper })

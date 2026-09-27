@@ -37,12 +37,26 @@ export function useSemantic<T>(query: string, options: UseSemanticOptions = {}) 
   if (current && held?.result !== current) setHeld({ query: normalized, result: current })
   const shown: Shown<T> | null = current ? { query: normalized, result: current } : held
 
+  // Until the first ranking made with every item embedded, results are partial: show each one as it comes (live),
+  // including that first complete one. After it, the commit policy holds the order. `partial` is the last result
+  // seen while embedding, so it can't count as complete when progress ends just before the final ranking arrives.
+  const [fill, setFill] = useState<{ partial: QueryResult<T> | null; by: QueryResult<T> | null }>({ partial: null, by: null })
+  if (fill.by === null && current) {
+    if (snapshot.embedding !== null) {
+      if (fill.partial !== current) setFill({ partial: current, by: null })
+    } else if (fill.partial !== current) {
+      setFill({ partial: fill.partial, by: current })
+    }
+  }
+  const filling = fill.by === null || fill.by === shown?.result
+
   const rows = useMemo(() => shown?.result.ranked ?? [], [shown?.result])
   const byKey = useMemo(() => new Map(rows.map((r) => [String(r.id), r])), [rows])
   const rankable = useMemo(() => rows.map((r) => ({ id: String(r.id), score: r.score })), [rows])
   const committed = useCommitPolicy(rankable, {
-    policy: options.commit ?? COMMIT_DEFAULTS.policy,
-    hysteresis: options.hysteresis ?? COMMIT_DEFAULTS.hysteresis,
+    policy: filling ? 'live' : (options.commit ?? COMMIT_DEFAULTS.policy),
+    // Scores from partial rankings are not worth holding on to: place each one fresh.
+    hysteresis: filling ? 0 : (options.hysteresis ?? COMMIT_DEFAULTS.hysteresis),
     idleMs: options.idleMs ?? COMMIT_DEFAULTS.idleMs,
   })
 

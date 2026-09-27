@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { Id, Vec } from '../core/types.ts'
 import type { Embedder } from './embedder.ts'
 import type { FromWorker, ToWorker } from './protocol.ts'
@@ -11,6 +11,8 @@ interface Doc {
 }
 
 /** Embeds by keyword: "fire" → x axis, "water" → y axis, anything else → z. */
+const keywordVector = (text: string): Vec => new Float32Array(text.includes('fire') ? [1, 0, 0] : text.includes('water') ? [0, 1, 0] : [0, 0, 1])
+
 function fakeEmbedder(opts: { fail?: boolean } = {}): Embedder & { calls: string[][] } {
   const calls: string[][] = []
   return {
@@ -19,7 +21,22 @@ function fakeEmbedder(opts: { fail?: boolean } = {}): Embedder & { calls: string
       calls.push([...texts])
       onProgress(0.5)
       if (opts.fail) throw new Error('offline')
-      return texts.map((t) => new Float32Array(t.includes('fire') ? [1, 0, 0] : t.includes('water') ? [0, 1, 0] : [0, 0, 1]))
+      return texts.map(keywordVector)
+    },
+  }
+}
+
+/** A keyword embedder that holds every call until open() — a model still downloading. */
+function gatedEmbedder(): Embedder & { calls: string[][]; open: () => void } {
+  let open = () => {}
+  const gate = new Promise<void>((resolve) => (open = resolve))
+  const inner = fakeEmbedder()
+  return {
+    calls: inner.calls,
+    open,
+    async embed(texts, onProgress) {
+      await gate
+      return inner.embed(texts, onProgress)
     },
   }
 }
@@ -39,13 +56,14 @@ function harness(config: Partial<SemanticWorkerConfig<Doc>> = {}) {
     port,
     { resourceCount: () => 0 },
   )
+  const dispatch = (m: ToWorker<Doc>) => listener?.({ data: m } as MessageEvent<ToWorker<Doc>>)
   const send = async (m: ToWorker<Doc>) => {
-    listener?.({ data: m } as MessageEvent<ToWorker<Doc>>)
+    dispatch(m)
     await runtime.idle()
   }
   const last = <K extends FromWorker<Doc>['type']>(type: K) =>
     out.filter((m): m is Extract<FromWorker<Doc>, { type: K }> => m.type === type).at(-1)
-  return { out, send, last, embedder, runtime }
+  return { out, dispatch, send, last, embedder, runtime }
 }
 
 const docs: Doc[] = [
@@ -171,5 +189,59 @@ describe('worker runtime', () => {
     await h.send({ type: 'upsert', items: docs })
     await h.send({ type: 'watch', query: 'fire' })
     expect(h.last('results')).toBeDefined()
+  })
+
+  describe('while a query waits for the model', () => {
+    const precomputed = async () => docs.map((d) => [d.id, keywordVector(d.text)] as const)
+    const resultsFor = (h: ReturnType<typeof harness>, query: string) =>
+      h.out.filter((m): m is Extract<FromWorker<Doc>, { type: 'results' }> => m.type === 'results' && m.query === query)
+
+    it('still answers similar-item requests and clicks', async () => {
+      const h = harness({ embedder: { embed: () => new Promise<Vec[]>(() => {}) }, precomputed })
+      await h.send({ type: 'upsert', items: docs })
+      h.dispatch({ type: 'watch', query: 'fire' })
+      h.dispatch({ type: 'similar', id: 'a', k: 2 })
+      h.dispatch({ type: 'interact', id: 'c', kind: 'open' })
+      await vi.waitFor(() => expect(h.last('results')?.result.interests.map((i) => i.id)).toEqual(['c']))
+      expect(h.last('similar')!.results.map((r) => r.id)).toContain('b')
+    })
+
+    it('ranks the query once its vector arrives, after the state changes sent before it', async () => {
+      const embedder = gatedEmbedder()
+      const h = harness({ embedder, precomputed })
+      await h.send({ type: 'upsert', items: docs })
+      h.dispatch({ type: 'watch', query: 'fire' })
+      h.dispatch({ type: 'interact', id: 'c', kind: 'open' })
+      embedder.open()
+      await h.runtime.idle()
+      const { result } = resultsFor(h, 'fire').at(-1)!
+      expect(result.ranked[0]).toMatchObject({ reason: { kind: 'search' } })
+      expect(['a', 'b']).toContain(result.ranked[0].id)
+      expect(result.interests.map((i) => i.id)).toEqual(['c'])
+    })
+
+    it('drops a query unwatched before its vector arrives', async () => {
+      const embedder = gatedEmbedder()
+      const h = harness({ embedder, precomputed })
+      await h.send({ type: 'upsert', items: docs })
+      h.dispatch({ type: 'watch', query: 'fire' })
+      h.dispatch({ type: 'unwatch', query: 'fire' })
+      embedder.open()
+      await h.runtime.idle()
+      expect(resultsFor(h, 'fire')).toEqual([])
+    })
+
+    it('embeds a query re-watched mid-download only once', async () => {
+      const embedder = gatedEmbedder()
+      const h = harness({ embedder, precomputed })
+      await h.send({ type: 'upsert', items: docs })
+      h.dispatch({ type: 'watch', query: 'fire' })
+      h.dispatch({ type: 'unwatch', query: 'fire' })
+      h.dispatch({ type: 'watch', query: 'fire' })
+      embedder.open()
+      await h.runtime.idle()
+      expect(embedder.calls).toEqual([['fire']])
+      expect(resultsFor(h, 'fire')).toHaveLength(1)
+    })
   })
 })

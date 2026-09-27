@@ -3,7 +3,7 @@ import { modelNote, searchDisabledReason } from './status.ts'
 
 describe('modelNote', () => {
   it('says that expanding waits for the model while it downloads', () => {
-    expect(modelNote({ status: 'loading', progress: 0.4, error: null })).toBe('Loading search model… 40% · expanding resumes once it has loaded')
+    expect(modelNote({ status: 'loading', progress: 0.4, error: null })).toBe('Loading search model… 40%')
   })
 
   it('confirms when the model is ready and says nothing before the first search', () => {

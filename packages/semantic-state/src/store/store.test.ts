@@ -38,6 +38,19 @@ describe('semantic store', () => {
     expect(store.getSnapshot()).toMatchObject({ status: 'error', error: 'boom' })
   })
 
+  it('tracks background embedding progress and clears it when a job ends', () => {
+    const { worker, emit } = fakeWorker()
+    const store = createSemanticStore(worker)
+    expect(store.getSnapshot().embedding).toBeNull()
+    emit({ type: 'embedProgress', done: 0, total: 6 })
+    expect(store.getSnapshot().embedding).toEqual({ done: 0, total: 6 })
+    emit({ type: 'embedProgress', done: 2, total: 6 })
+    expect(store.getSnapshot().embedding).toEqual({ done: 2, total: 6 })
+    emit({ type: 'embedProgress', done: 6, total: 6 })
+    expect(store.getSnapshot().embedding).toBeNull()
+    expect(store.getServerSnapshot().embedding).toBeNull()
+  })
+
   it('reference-counts watched queries', () => {
     const { worker, sent } = fakeWorker()
     const store = createSemanticStore(worker)

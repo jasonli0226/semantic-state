@@ -62,6 +62,16 @@ describe('useSemantic', () => {
     expect(sent.at(-1)).toEqual({ type: 'unwatch', query: 'cats' })
   })
 
+  it('exposes background embedding progress', () => {
+    const { emit, wrapper } = setup()
+    const { result: hook } = renderHook(() => useSemantic<Doc>('cats'), { wrapper })
+    expect(hook.current.embedding).toBeNull()
+    emit({ type: 'embedProgress', done: 32, total: 100 })
+    expect(hook.current.embedding).toEqual({ done: 32, total: 100 })
+    emit({ type: 'embedProgress', done: 100, total: 100 })
+    expect(hook.current.embedding).toBeNull()
+  })
+
   it('keeps showing the previous results while a new query is being ranked', () => {
     const { emit, wrapper } = setup()
     const { result: hook, rerender } = renderHook(({ q }) => useSemantic<Doc>(q), { wrapper, initialProps: { q: 'cats' } })

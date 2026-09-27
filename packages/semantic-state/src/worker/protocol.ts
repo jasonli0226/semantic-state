@@ -42,6 +42,8 @@ export type FromWorker<T> =
   | { readonly type: 'modelReady' }
   /** Embedding is unavailable; ranking by existing vectors and interests keeps working. */
   | { readonly type: 'modelError'; readonly message: string }
+  /** Background item embedding: `done` of `total` queued items have vectors. `done === total` ends the job. */
+  | { readonly type: 'embedProgress'; readonly done: number; readonly total: number }
   | { readonly type: 'error'; readonly message: string }
   | { readonly type: 'results'; readonly query: string; readonly result: QueryResult<T> }
   | { readonly type: 'similar'; readonly id: Id; readonly k: number; readonly results: readonly ResultRow<T>[] }

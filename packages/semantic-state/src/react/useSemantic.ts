@@ -63,6 +63,8 @@ export function useSemantic<T>(query: string, options: UseSemanticOptions = {}) 
     status: snapshot.status,
     error: snapshot.error,
     model: snapshot.model,
+    /** Items being embedded in the background (`{ done, total }`), or null. Results rank the embedded ones meanwhile. */
+    embedding: snapshot.embedding,
     /** The query as sent to the worker (trimmed, capped). */
     query: normalized,
     /** The query the shown results belong to — differs from `query` while a new one is being ranked. */

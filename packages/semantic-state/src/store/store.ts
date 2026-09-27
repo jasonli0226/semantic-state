@@ -22,6 +22,8 @@ export interface SemanticSnapshot<T> {
   readonly status: 'starting' | 'ready' | 'error'
   readonly error: string | null
   readonly model: ModelState
+  /** Items being embedded in the background; null when none are. */
+  readonly embedding: { readonly done: number; readonly total: number } | null
   readonly results: Readonly<Record<string, QueryResult<T>>>
   /** Keyed `${id}:${k}`. */
   readonly similar: Readonly<Record<string, readonly ResultRow<T>[]>>
@@ -64,6 +66,7 @@ const INITIAL: SemanticSnapshot<never> = {
   status: 'starting',
   error: null,
   model: { status: 'idle', progress: 0, error: null },
+  embedding: null,
   results: {},
   similar: {},
   weights: {},
@@ -82,6 +85,8 @@ function reduce<T>(s: SemanticSnapshot<T>, m: FromWorker<T>): SemanticSnapshot<T
       return { ...s, model: { status: 'ready', progress: 1, error: null } }
     case 'modelError':
       return { ...s, model: { status: 'error', progress: 0, error: m.message } }
+    case 'embedProgress':
+      return { ...s, embedding: m.done >= m.total ? null : { done: m.done, total: m.total } }
     case 'results':
       return { ...s, results: { ...s.results, [m.query]: m.result } }
     case 'similar':

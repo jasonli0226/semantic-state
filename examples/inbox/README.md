@@ -22,7 +22,8 @@ The data is plain JSON in [`src/data/inbox.json`](src/data/inbox.json), validate
 ## How it uses semantic-state
 
 - [`src/semantic/semantic.worker.ts`](src/semantic/semantic.worker.ts) — the whole semantic side is one
-  `defineSemanticWorker` call: centroid attention with `{ open: 1, done: 1.5 }`, the inbox scorer, duplicate folding at 0.62.
+  `defineSemanticWorker` call: centroid attention with `{ open: 1, done: 1.5 }`, the inbox scorer, duplicate folding at 0.62,
+  and `vectorCache: indexedDbVectorCache({ model })`, so a reload embeds nothing.
 - [`src/core/rank.ts`](src/core/rank.ts) — `inboxScorer`: deadlines and freshness always count; the centroid counts more
   as history builds up; opened items are pushed down. Also used by the headless eval, so it tests the worker's code path.
 - [`src/app/inboxStore.ts`](src/app/inboxStore.ts) — exact state (items, seen, done, focus) in a ~50-line external

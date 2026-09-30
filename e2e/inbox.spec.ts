@@ -76,3 +76,47 @@ test('scale test: 10k items are ranked in the worker, the page stays responsive'
   await page.waitForTimeout(500) // let the FLIP animation settle
   await page.screenshot({ path: 'docs/demo-10k.png' })
 })
+
+/** Entries in the worker's vector cache (0 if the database does not exist yet). */
+const cachedVectors = (page: Page) =>
+  page.evaluate(
+    () =>
+      new Promise<number>((resolve) => {
+        const req = indexedDB.open('semantic-state')
+        req.onupgradeneeded = () => req.transaction?.abort() // not created yet: don't create it here
+        req.onerror = () => resolve(0)
+        req.onsuccess = () => {
+          const db = req.result
+          if (!db.objectStoreNames.contains('vectors')) return (db.close(), resolve(0))
+          const count = db.transaction('vectors', 'readonly').objectStore('vectors').count()
+          count.onsuccess = () => (db.close(), resolve(count.result))
+          count.onerror = () => (db.close(), resolve(0))
+        }
+      }),
+  )
+
+test('a reload embeds nothing: item vectors come from the IndexedDB cache', async ({ page }) => {
+  await ready(page)
+  await expect(page.getByText(/^Embedding \d+ of \d+ items/)).toHaveCount(0)
+  // Cache writes are fire-and-forget: wait until the count is non-zero and stable.
+  await expect
+    .poll(async () => {
+      const before = await cachedVectors(page)
+      await page.waitForTimeout(300)
+      return before > 0 && before === (await cachedVectors(page))
+    })
+    .toBe(true)
+
+  // Record whether the embedding banner ever appears during the reload.
+  await page.addInitScript(() => {
+    const w = window as unknown as { sawEmbedding: boolean }
+    w.sawEmbedding = false
+    new MutationObserver(() => {
+      if (/Embedding \d+ of \d+ items/.test(document.body?.textContent ?? '')) w.sawEmbedding = true
+    }).observe(document, { childList: true, subtree: true, characterData: true })
+  })
+  await page.reload()
+  await expect(page.getByRole('button', { name: '2. Work on payments' })).toBeEnabled({ timeout: 150_000 })
+  await expect(panel(page, SEMANTIC).locator('.row').first()).toBeVisible()
+  expect(await page.evaluate(() => (window as unknown as { sawEmbedding: boolean }).sawEmbedding)).toBe(false)
+})

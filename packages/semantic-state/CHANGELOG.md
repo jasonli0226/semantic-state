@@ -13,6 +13,10 @@ breaking changes are listed under **Changed** or **Removed**.
   worker handles other messages between batches. Results rank the items embedded so far, and progress arrives as
   `embedProgress` → `snapshot.embedding` → `useSemantic().embedding` (`{ done, total } | null`).
   ([#31](https://github.com/jasonli0226/semantic-state/issues/31))
+- Vector cache: `defineSemanticWorker({ vectorCache: indexedDbVectorCache({ model }) })` keeps item vectors in
+  IndexedDB, so a reload embeds only new or edited items. `clearVectorCache()` (root entry) deletes it, e.g. on
+  logout after `store.dispose()`. With `emitVectors`, cache hits are posted as `embedded` with `cached: true`.
+  ([#10](https://github.com/jasonli0226/semantic-state/issues/10))
 
 ### Changed
 

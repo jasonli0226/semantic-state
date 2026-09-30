@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import type { VectorCache } from '../cache/vectorCache.ts'
 import { defaultScorer } from '../core/rank.ts'
 import type { Id, Vec } from '../core/types.ts'
 import type { Embedder } from './embedder.ts'
@@ -103,6 +104,36 @@ const resultsFor = (h: ReturnType<typeof harness>, query: string) =>
 
 const progressOf = (h: ReturnType<typeof harness>) =>
   h.out.filter((m): m is Extract<FromWorker<Doc>, { type: 'embedProgress' }> => m.type === 'embedProgress').map(({ done, total }) => [done, total])
+
+/** An in-memory VectorCache that records its calls. */
+function memoryCache(initial: readonly (readonly [Id, string, Vec])[] = [], opts: { failGet?: boolean; failSet?: boolean } = {}) {
+  let entries = new Map(initial.map(([id, text, vector]) => [id, { text, vector }] as const))
+  const gets: Id[][] = []
+  const sets: (readonly [Id, string, Vec])[][] = []
+  const cache: VectorCache = {
+    async get(requested) {
+      gets.push(requested.map(([id]) => id))
+      if (opts.failGet) throw new Error('disk')
+      return new Map(
+        requested.flatMap(([id, text]) => {
+          const hit = entries.get(id)
+          return hit?.text === text ? [[id, hit.vector] as const] : []
+        }),
+      )
+    },
+    async set(written) {
+      sets.push([...written])
+      if (opts.failSet) throw new Error('quota')
+      entries = new Map([...entries, ...written.map(([id, text, vector]) => [id, { text, vector }] as const)])
+    },
+    async clear() {
+      entries = new Map()
+    },
+  }
+  return { cache, gets, sets }
+}
+
+const cached = (ds: readonly Doc[]) => ds.map((d) => [d.id, d.text, keywordVector(d.text)] as const)
 
 describe('worker runtime', () => {
   it('announces ready with the initial weights', async () => {
@@ -541,6 +572,111 @@ describe('worker runtime', () => {
         await h.send({ type: 'upsert', items: sixDocs })
         expect(progressOf(h).at(-1)).toEqual([6, 6])
       }
+    })
+  })
+  describe('vector cache', () => {
+    it('skips embedding when every item is cached', async () => {
+      const h = harness({ vectorCache: memoryCache(cached(docs)).cache })
+      await h.send({ type: 'upsert', items: docs })
+      await h.send({ type: 'watch', query: 'fire' })
+      expect(h.embedder.calls).toEqual([['fire']]) // only the query
+      expect(progressOf(h)).toEqual([])
+      expect(['a', 'b']).toContain(h.last('results')!.result.ranked[0].id)
+    })
+
+    it('embeds only the misses, and progress counts only them (a reload during the first visit)', async () => {
+      const h = harness({ vectorCache: memoryCache(cached(docs.slice(0, 2))).cache })
+      await h.send({ type: 'upsert', items: docs })
+      expect(h.embedder.calls).toEqual([['water turtle', 'rock snake']])
+      expect(progressOf(h)).toEqual([[0, 2], [2, 2]])
+    })
+
+    it('writes embedded vectors with their text, so the next visit embeds nothing', async () => {
+      const { cache, sets } = memoryCache()
+      const first = harness({ vectorCache: cache })
+      await first.send({ type: 'upsert', items: docs })
+      expect(sets.flat().map(([id, text]) => [id, text])).toEqual(docs.map((d) => [d.id, d.text]))
+      const second = harness({ vectorCache: cache })
+      await second.send({ type: 'upsert', items: docs })
+      expect(second.embedder.calls).toEqual([])
+    })
+
+    it('re-embeds an item whose text changed since it was cached, and overwrites the entry', async () => {
+      const { cache, sets } = memoryCache(cached([docs[0]]))
+      const h = harness({ vectorCache: cache })
+      await h.send({ type: 'upsert', items: [{ ...docs[0], text: 'water lizard' }] })
+      expect(h.embedder.calls).toEqual([['water lizard']])
+      expect(sets.flat().map(([id, text]) => [id, text])).toEqual([['a', 'water lizard']])
+    })
+
+    it('does not consult the cache for supplied or precomputed vectors', async () => {
+      const { cache, gets } = memoryCache([['a', 'fire lizard', new Float32Array([0, 0, 1])]])
+      const h = harness({ vectorCache: cache, precomputed: async () => [['b', keywordVector('fire dragon')] as const] })
+      await h.send({ type: 'upsert', items: [docs[0]], vectors: [['a', new Float32Array([1, 0, 0])]] })
+      await h.send({ type: 'upsert', items: [docs[1]] })
+      expect(gets).toEqual([]) // nothing was stale, so the cache was never opened
+      expect(h.embedder.calls).toEqual([])
+    })
+
+    it('embeds the last text when an upsert repeats an id, even if an earlier text is cached', async () => {
+      const h = harness({ vectorCache: memoryCache(cached([docs[0]])).cache })
+      await h.send({ type: 'upsert', items: [docs[0], { ...docs[0], text: 'water lizard' }] })
+      expect(h.embedder.calls).toEqual([['water lizard']])
+    })
+
+    it('uses the cache on reset too', async () => {
+      const h = harness({ vectorCache: memoryCache(cached(docs)).cache })
+      await h.send({ type: 'reset', items: docs })
+      expect(h.embedder.calls).toEqual([])
+    })
+
+    it('ignores vectors a custom cache returns for ids it was not asked about', async () => {
+      const cache: VectorCache = {
+        get: async () => new Map([['a', keywordVector('fire')], ['zzz', keywordVector('water')]]),
+        set: async () => {},
+        clear: async () => {},
+      }
+      const h = harness({ vectorCache: cache, emitVectors: true })
+      await h.send({ type: 'upsert', items: [docs[0]] })
+      expect(h.last('embedded')!.vectors.map(([id]: readonly [Id, Vec]) => id)).toEqual(['a'])
+    })
+
+    it('keeps embedding when the cache read fails, and warns', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const h = harness({ vectorCache: memoryCache([], { failGet: true }).cache })
+      await h.send({ type: 'upsert', items: docs })
+      await h.send({ type: 'watch', query: 'water' })
+      expect(h.embedder.calls[0]).toHaveLength(4)
+      expect(h.last('results')!.result.ranked[0].id).toBe('c')
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('[semantic-state] vector cache read failed'))
+      expect(h.last('error')).toBeUndefined()
+      warn.mockRestore()
+    })
+
+    it('keeps ranking when the cache write fails, and warns', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const h = harness({ vectorCache: memoryCache([], { failSet: true }).cache })
+      await h.send({ type: 'upsert', items: docs })
+      await h.send({ type: 'watch', query: 'water' })
+      expect(h.last('results')!.result.ranked[0].id).toBe('c')
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('[semantic-state] vector cache write failed'))
+      expect(h.last('error')).toBeUndefined()
+      warn.mockRestore()
+    })
+
+    it('echoes cache hits as cached vectors when emitVectors is on', async () => {
+      const h = harness({ vectorCache: memoryCache(cached(docs.slice(0, 1))).cache, emitVectors: true })
+      await h.send({ type: 'upsert', items: [docs[0]] })
+      expect(h.last('embedded')).toEqual({ type: 'embedded', vectors: [['a', keywordVector('fire lizard')]], embedMs: 0, cached: true })
+    })
+
+    it('never loads the model when every item is cached and no query needs embedding', async () => {
+      const h = harness({ vectorCache: memoryCache(cached(docs)).cache })
+      await h.send({ type: 'watch', query: '' })
+      await h.send({ type: 'upsert', items: docs })
+      expect(h.last('modelReady')).toBeUndefined()
+      expect(h.embedder.calls).toEqual([])
+      expect(resultsFor(h, '').at(-1)!.result.itemCount).toBe(4)
     })
   })
 })

@@ -47,5 +47,6 @@ export type FromWorker<T> =
   | { readonly type: 'error'; readonly message: string }
   | { readonly type: 'results'; readonly query: string; readonly result: QueryResult<T> }
   | { readonly type: 'similar'; readonly id: Id; readonly k: number; readonly results: readonly ResultRow<T>[] }
-  | { readonly type: 'embedded'; readonly vectors: readonly (readonly [Id, Vec])[]; readonly embedMs: number }
+  /** New item vectors (with `emitVectors`). `cached`: read from the vector cache, not embedded now (`embedMs` is 0). */
+  | { readonly type: 'embedded'; readonly vectors: readonly (readonly [Id, Vec])[]; readonly embedMs: number; readonly cached?: boolean }
   | { readonly type: 'queryEmbedded'; readonly query: string; readonly vector: Vec }

@@ -92,7 +92,7 @@ function reduce<T>(s: SemanticSnapshot<T>, m: FromWorker<T>): SemanticSnapshot<T
     case 'similar':
       return { ...s, similar: { ...s.similar, [similarKey(m.id, m.k)]: m.results } }
     case 'embedded':
-      return { ...s, lastEmbedMs: m.embedMs }
+      return m.cached ? s : { ...s, lastEmbedMs: m.embedMs }
     case 'queryEmbedded':
       return s
   }

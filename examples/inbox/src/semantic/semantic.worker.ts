@@ -1,5 +1,5 @@
 import { transformersEmbedder } from 'semantic-state/transformers'
-import { defineSemanticWorker } from 'semantic-state/worker'
+import { defineSemanticWorker, indexedDbVectorCache } from 'semantic-state/worker'
 import { inboxScorer } from '../core/rank.ts'
 import type { Item } from '../core/types.ts'
 import { DEMO_NOW, embeddingText } from '../data/dataset.ts'
@@ -10,6 +10,8 @@ defineSemanticWorker<Item>({
   id: (item) => item.id,
   text: embeddingText,
   embedder: transformersEmbedder({ model: EMBEDDING_MODEL, dtype: 'q8' }),
+  // Repeat visits: items whose text is unchanged come from IndexedDB, not the model.
+  vectorCache: indexedDbVectorCache({ model: EMBEDDING_MODEL }),
   interests: INBOX_INTERESTS,
   score: inboxScorer(DEMO_NOW),
   group: { duplicates: { threshold: INBOX_DUPLICATE_THRESHOLD } },

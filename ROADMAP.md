@@ -16,7 +16,6 @@ links to an issue where the details and progress live. Suggestions welcome — o
 
 | Item | Issue |
 |---|---|
-| Persist vectors in IndexedDB so reloads don't re-embed | [#10](https://github.com/jasonli0226/semantic-state/issues/10) |
 | Approximate nearest-neighbour index for collections beyond ~10k items | [#11](https://github.com/jasonli0226/semantic-state/issues/11) |
 | Embedder options: WebGPU, and bring-your-own (server) embedders | [#12](https://github.com/jasonli0226/semantic-state/issues/12) |
 | Calibrate `Belief.confidence` | [#13](https://github.com/jasonli0226/semantic-state/issues/13) |

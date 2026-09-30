@@ -1,3 +1,4 @@
+import type { VectorCache } from '../cache/vectorCache.ts'
 import { type AttentionState, EMPTY_ATTENTION, type InterestConfig, forgetInteraction, recordInteraction } from '../core/attention.ts'
 import { type Grouping, type Scorer, defaultScorer, rankForDisplay, scoreAll, similarTo } from '../core/rank.ts'
 import type { FeatureVectors, Id, Scored, Vec, Weights } from '../core/types.ts'
@@ -17,6 +18,8 @@ export interface SemanticWorkerConfig<T> {
   readonly features?: (items: readonly T[]) => ReadonlyMap<Id, FeatureVectors>
   /** Vectors computed ahead of time (see fetchVectorFile); those items skip embedding. */
   readonly precomputed?: () => Promise<Iterable<readonly [Id, Vec]>>
+  /** Keeps item vectors between visits (see indexedDbVectorCache); items whose text is unchanged skip embedding. */
+  readonly vectorCache?: VectorCache
   readonly interests: InterestConfig
   /** Combines the signals into a score. Defaults to a 60/40 query/interest blend. */
   readonly score?: Scorer<T>
@@ -69,6 +72,8 @@ export function createWorkerRuntime<T>(config: SemanticWorkerConfig<T>, port: Wo
   const queries = new Map<string, Vec | null | 'embedding'>()
   const queryCache = new Map<string, Vec>()
   const queryEmbeds = new Map<string, Promise<void>>()
+  /** Cache writes in flight; only `idle()` waits for them. */
+  let writes = new Set<Promise<void>>()
   let model: 'idle' | 'ready' = 'idle'
   let requestsAtModelReady = 0
   /** Ids whose current text has no vector yet, in the order they were queued. Drained by the embed job. */
@@ -100,6 +105,51 @@ export function createWorkerRuntime<T>(config: SemanticWorkerConfig<T>, port: Wo
     extraFeatures = config.features ? config.features([...items.values()]) : new Map()
   }
 
+  /** Where an incoming item's vector comes from. `known`: the text each current vector was computed from. */
+  function sourceOf(id: Id, text: string, given: ReadonlyMap<Id, Vec>, known: ReadonlyMap<Id, string>): 'given' | 'precomputed' | 'current' | 'stale' {
+    if (given.has(id)) return 'given'
+    if (precomputedIds.has(id) && !known.has(id)) return 'precomputed'
+    return known.get(id) === text ? 'current' : 'stale'
+  }
+
+  /** Cached vectors for the incoming items that would otherwise be embedded. A failing cache means "embed as usual". */
+  async function fromCache(incoming: readonly T[], supplied: readonly (readonly [Id, Vec])[] = []): Promise<(readonly [Id, Vec])[]> {
+    if (!config.vectorCache) return []
+    const given = new Map(supplied)
+    const wanted = incoming.flatMap((item) => {
+      const id = config.id(item)
+      const text = config.text(item)
+      return sourceOf(id, text, given, embeddedText) === 'stale' ? [[id, text] as const] : []
+    })
+    if (wanted.length === 0) return []
+    try {
+      const found = await config.vectorCache.get(wanted)
+      const hits = wanted.flatMap(([id]) => {
+        const vector = found.get(id)
+        return vector === undefined ? [] : [[id, vector] as const]
+      })
+      // Found, not supplied by the app, so echo them like fresh embeddings.
+      if (config.emitVectors && hits.length > 0) post({ type: 'embedded', vectors: hits, embedMs: 0, cached: true })
+      return hits
+    } catch (error) {
+      console.warn(`[semantic-state] vector cache read failed, embedding instead: ${errorMessage(error)}`)
+      return []
+    }
+  }
+
+  /** Outside the queue: embedding never waits on disk. */
+  function toCache(entries: readonly (readonly [Id, string, Vec])[]) {
+    const cache = config.vectorCache
+    if (!cache || entries.length === 0) return
+    const write = Promise.resolve()
+      .then(() => cache.set(entries))
+      .catch((error: unknown) => console.warn(`[semantic-state] vector cache write failed: ${errorMessage(error)}`))
+    writes = new Set([...writes, write])
+    void write.then(() => {
+      writes = new Set([...writes].filter((w) => w !== write))
+    })
+  }
+
   /** Stores items and supplied vectors and queues stale items for the embed job. Returns true if it queued new ids. */
   function upsert(incoming: readonly T[], supplied: readonly (readonly [Id, Vec])[] = []): boolean {
     const given = new Map(supplied)
@@ -110,18 +160,21 @@ export function createWorkerRuntime<T>(config: SemanticWorkerConfig<T>, port: Wo
     for (const item of incoming) {
       const id = config.id(item)
       const text = config.text(item)
-      const vector = given.get(id)
-      if (vector) {
-        nextVectors.set(id, vector)
-        nextText.set(id, text)
-        settled.add(id)
-      } else if (precomputedIds.has(id) && !nextText.has(id)) {
-        nextText.set(id, text)
-        settled.add(id)
-      } else if (nextText.get(id) !== text) {
-        stale.add(id)
-      } else {
-        settled.add(id)
+      switch (sourceOf(id, text, given, nextText)) {
+        case 'given':
+          nextVectors.set(id, given.get(id)!)
+          nextText.set(id, text)
+          settled.add(id)
+          break
+        case 'precomputed':
+          nextText.set(id, text)
+          settled.add(id)
+          break
+        case 'current':
+          settled.add(id)
+          break
+        case 'stale':
+          stale.add(id)
       }
     }
     items = new Map([...items, ...incoming.map((item) => [config.id(item), item] as const)])
@@ -188,13 +241,15 @@ export function createWorkerRuntime<T>(config: SemanticWorkerConfig<T>, port: Wo
   /** Runs inside the queue: store what is still current, then take the next batch or finish. */
   function applyBatch(batch: readonly (readonly [Id, string])[], fresh: readonly Vec[], embedMs: number) {
     // Only if the id is still queued with the same text: an edit, remove or supplied vector mid-batch wins.
-    const stored = batch.flatMap(([id, text], i) => {
+    const kept = batch.flatMap(([id, text], i) => {
       const item = items.get(id)
-      return pending.has(id) && item !== undefined && config.text(item) === text ? [[id, fresh[i]] as const] : []
+      return pending.has(id) && item !== undefined && config.text(item) === text ? [[id, text, fresh[i]] as const] : []
     })
+    const stored = kept.map(([id, , vector]) => [id, vector] as const)
     const storedIds = new Set(stored.map(([id]) => id))
     vectors = new Map([...vectors, ...stored])
-    embeddedText = new Map([...embeddedText, ...batch.filter(([id]) => storedIds.has(id))])
+    embeddedText = new Map([...embeddedText, ...kept.map(([id, text]) => [id, text] as const)])
+    toCache(kept)
     pending = new Set([...pending].filter((id) => !storedIds.has(id)))
     progress = { ...progress, done: progress.done + stored.length }
     refreshFeatures()
@@ -299,9 +354,12 @@ export function createWorkerRuntime<T>(config: SemanticWorkerConfig<T>, port: Wo
 
   async function handle(message: ToWorker<T>): Promise<void> {
     switch (message.type) {
-      case 'upsert':
-        if (upsert(message.items, message.vectors)) return // ranked when its first batch is applied
+      case 'upsert': {
+        // Cache hits take the supplied-vector path: settled at once, never queued for embedding.
+        const hits = await fromCache(message.items, message.vectors)
+        if (upsert(message.items, [...(message.vectors ?? []), ...hits])) return // ranked when its first batch is applied
         break
+      }
       case 'remove': {
         const gone = new Set(message.ids)
         items = new Map([...items].filter(([id]) => !gone.has(id)))
@@ -310,12 +368,13 @@ export function createWorkerRuntime<T>(config: SemanticWorkerConfig<T>, port: Wo
         break
       }
       case 'reset': {
+        const hits = await fromCache(message.items)
         // Vectors stay cached, so re-adding the same items costs no embedding.
         items = new Map()
         attention = EMPTY_ATTENTION
         const kept = new Set(message.items.map(config.id))
         pending = new Set([...pending].filter((id) => kept.has(id)))
-        if (upsert(message.items)) return
+        if (upsert(message.items, hits)) return
         break
       }
       case 'interact':
@@ -370,12 +429,12 @@ export function createWorkerRuntime<T>(config: SemanticWorkerConfig<T>, port: Wo
   port.addEventListener('message', ({ data }) => enqueue(() => handle(data)))
 
   return {
-    /** Resolves once every queued message, query embedding and the embed job have been handled (for tests). */
+    /** Resolves once every queued message, query embedding, the embed job and cache writes have been handled (for tests). */
     async idle() {
       for (;;) {
         const current = queue
-        await Promise.all([current, job, ...queryEmbeds.values()])
-        if (current === queue && job === null && queryEmbeds.size === 0) return
+        await Promise.all([current, job, ...queryEmbeds.values(), ...writes])
+        if (current === queue && job === null && queryEmbeds.size === 0 && writes.size === 0) return
       }
     },
   }

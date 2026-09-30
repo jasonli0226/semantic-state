@@ -124,6 +124,18 @@ describe('semantic store', () => {
     expect(store.getSnapshot().lastEmbedMs).toBe(2)
   })
 
+  it('passes cached vectors to listeners without treating them as an embedding time', () => {
+    const { worker, emit } = fakeWorker()
+    const store = createSemanticStore(worker)
+    const listener = vi.fn()
+    store.onEmbedded(listener)
+    const v = new Float32Array([1])
+    emit({ type: 'embedded', vectors: [['a', v]], embedMs: 2 })
+    emit({ type: 'embedded', vectors: [['b', v]], embedMs: 0, cached: true })
+    expect(listener).toHaveBeenLastCalledWith([['b', v]])
+    expect(store.getSnapshot().lastEmbedMs).toBe(2)
+  })
+
   it('terminates the worker on dispose', () => {
     const { worker } = fakeWorker()
     createSemanticStore(worker).dispose()

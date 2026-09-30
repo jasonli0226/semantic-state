@@ -90,6 +90,7 @@ Spread `panelProps` on the list: pointer and keyboard activity inside it holds t
 | **Scorer** | `score(input)` combines `querySim`, `interest`, `history`, `interacted` into `{ score, confidence, reason }` — add deadlines, boosts or penalties here. Default: 60/40 query/interest blend. |
 | **Grouping** | `group: { key: (item) => familyId }` or `group: { duplicates: { threshold } }` folds results; `Belief.groupExtras` says how many were folded. |
 | **Precomputed vectors** | `precomputed: () => fetchVectorFile(vectorsUrl, metaUrl)` — build-time embeddings, so a large static catalogue needs no model until the user types a search. |
+| **Vector cache** | `vectorCache: indexedDbVectorCache({ model })` keeps item vectors in IndexedDB between visits: on a reload, items whose text is unchanged skip embedding (no progress, no model load for items). Pass the same `model` string the embedder uses. On a full hit with no query that needs embedding, the model never loads, so `model.status` stays `'idle'`: gate UI on `status` and results, not on the model. |
 | **Background embedding** | Items without vectors are embedded in batches of `embedBatchSize` (default 32) between other messages: clicks and searches stay responsive, results rank the items embedded so far, and `useSemantic().embedding` reports `{ done, total }`. While the list first fills, the commit policy still applies (without hysteresis), and the first complete ranking is committed once whatever the policy, so the first load never stays on a partial ranking. |
 | **Commit policy** | `onIdle` (after the pointer rests ~2 s or leaves), `manual` (`pending` counts + `commit()`), `live`. Hysteresis stops tiny score changes from reordering. |
 
@@ -97,9 +98,9 @@ Spread `panelProps` on the list: pointer and keyboard activity inside it holds t
 
 | Import | Exports |
 |---|---|
-| `semantic-state` | `createSemanticStore`, `normalizeQuery`, types (`Belief`, `Reason`, `Id`, `Weights`, `QueryResult`, `ResultRow`, `SemanticSnapshot`, `ModelState`) |
+| `semantic-state` | `createSemanticStore`, `normalizeQuery`, `clearVectorCache`, types (`Belief`, `Reason`, `Id`, `Weights`, `QueryResult`, `ResultRow`, `SemanticSnapshot`, `ModelState`) |
 | `semantic-state/react` | `SemanticProvider`, `useSemantic`, `useSimilar`, `useSemanticSnapshot`, `useSemanticStore`, `useCommitPolicy`, `useActivity` |
-| `semantic-state/worker` | `defineSemanticWorker`, `createWorkerRuntime` (testable with a fake port), `fetchVectorFile`, `decodeVectorFile`, `Embedder` |
+| `semantic-state/worker` | `defineSemanticWorker`, `createWorkerRuntime` (testable with a fake port), `fetchVectorFile`, `decodeVectorFile`, `indexedDbVectorCache`, `VectorCache`, `Embedder` |
 | `semantic-state/transformers` | `transformersEmbedder({ model, dtype, batchSize })` — needs `@huggingface/transformers` |
 | `semantic-state/core` | Pure functions: `scoreAll`, `rankForDisplay`, `similarTo`, `defaultScorer`, attention, interests, dedupe, commit planner — for evals and custom scorers |
 
@@ -139,9 +140,26 @@ return <SemanticProvider store={store}>{children}</SemanticProvider>
 
 More in [docs/use-cases.md](../../docs/use-cases.md).
 
+## Vector cache: privacy and logout
+
+- IndexedDB is readable by any script on the same origin (other tabs, workers, an XSS), by DevTools, by extensions
+  with site access and by anyone with the browser profile. It is not encrypted.
+- Embedding inversion can partly recover text from vectors, so cached vectors of private content are about as
+  sensitive as the text. The stored text hash is an integrity check, not a secret: short or guessable text can be
+  brute-forced from it.
+- On logout, dispose the store first, then clear:
+
+  ```ts
+  semantic.dispose() // terminates the worker, so no cache write can land after the clear
+  await clearVectorCache()
+  ```
+
+- The browser may evict the cache (storage pressure, private windows, Safari after 7 days without a visit). A miss
+  just embeds again.
+
 ## Limits (v0.1)
 
-- In-memory index only (no IndexedDB persistence); a linear scan is fine to ~10k items.
+- The index is in memory (vectors can be cached in IndexedDB, see above); a linear scan is fine to ~10k items.
 - With `interests: { mode: 'centroid' }`, a click on an item that has no vector yet (still embedding) does not move the centroid; wait for `embedding === null` if clicks come early.
 - Confidence is uncalibrated — treat it as a display hint.
 - Small embedding models are weak at near-duplicate detection and negation; tune thresholds per dataset.

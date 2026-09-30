@@ -618,6 +618,12 @@ describe('worker runtime', () => {
       expect(h.embedder.calls).toEqual([])
     })
 
+    it('embeds the last text when an upsert repeats an id, even if an earlier text is cached', async () => {
+      const h = harness({ vectorCache: memoryCache(cached([docs[0]])).cache })
+      await h.send({ type: 'upsert', items: [docs[0], { ...docs[0], text: 'water lizard' }] })
+      expect(h.embedder.calls).toEqual([['water lizard']])
+    })
+
     it('uses the cache on reset too', async () => {
       const h = harness({ vectorCache: memoryCache(cached(docs)).cache })
       await h.send({ type: 'reset', items: docs })

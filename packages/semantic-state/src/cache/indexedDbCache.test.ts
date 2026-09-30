@@ -117,4 +117,31 @@ describe('indexedDbVectorCache', () => {
     vi.stubGlobal('indexedDB', undefined)
     await expect(clearVectorCache()).rejects.toThrow('IndexedDB is not available')
   })
+  it('closes its connection when another tab deletes the database, then reopens on next use', async () => {
+    const cache = indexedDbVectorCache({ model: 'm' })
+    await cache.set([['a', 'fire', v(1, 0)]])
+    await new Promise<void>((resolve, reject) => {
+      const req = indexedDB.deleteDatabase('semantic-state')
+      req.onsuccess = () => resolve()
+      req.onerror = () => reject(req.error)
+      req.onblocked = () => reject(new Error('blocked by the cache connection'))
+    })
+    expect(await cache.get([['a', 'fire']])).toEqual(new Map())
+    await cache.set([['a', 'fire', v(1, 0)]])
+    expect((await cache.get([['a', 'fire']])).get('a')).toEqual(v(1, 0))
+  })
+
+  it('gives up on an open that never finishes, so the worker is never stuck', async () => {
+    vi.useFakeTimers()
+    try {
+      vi.spyOn(indexedDB, 'open').mockReturnValue({} as IDBOpenDBRequest) // never succeeds, fails or blocks
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const lookup = indexedDbVectorCache({ model: 'm' }).get([['a', 'fire']])
+      await vi.advanceTimersByTimeAsync(10_000)
+      expect(await lookup).toEqual(new Map())
+      expect(warn.mock.calls[0][0]).toContain('[semantic-state] vector cache disabled')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })

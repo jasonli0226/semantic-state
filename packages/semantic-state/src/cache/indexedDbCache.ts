@@ -19,6 +19,8 @@ interface Row {
 const DEFAULT_NAME = 'semantic-state'
 const STORE = 'vectors'
 const VERSION = 1
+/** An open that never settles (blocked, or a browser bug) must not hold up the worker's queue. */
+const OPEN_TIMEOUT_MS = 3_000
 const errorMessage = (error: unknown) => (error instanceof Error ? error.message : String(error))
 
 const request = <R>(req: IDBRequest<R>) =>
@@ -38,7 +40,14 @@ function openDatabase(name: string): Promise<IDBDatabase> {
   if (typeof indexedDB === 'undefined') return Promise.reject(new Error('IndexedDB is not available'))
   const req = indexedDB.open(name, VERSION)
   req.onupgradeneeded = () => req.result.createObjectStore(STORE, { keyPath: ['model', 'id'] })
-  return request(req)
+  const opened = request(req)
+  return new Promise<IDBDatabase>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`IndexedDB open did not finish within ${OPEN_TIMEOUT_MS} ms`))
+      void opened.then((db) => db.close(), () => {}) // too late: don't leak the connection
+    }, OPEN_TIMEOUT_MS)
+    opened.then(resolve, reject).finally(() => clearTimeout(timer))
+  })
 }
 
 async function sha256(text: string): Promise<string> {
@@ -62,10 +71,23 @@ const isRow = (value: unknown): value is Row => {
 export function indexedDbVectorCache({ model, name = DEFAULT_NAME }: IndexedDbVectorCacheOptions): VectorCache {
   let opening: Promise<IDBDatabase | null> | null = null
   const database = () =>
-    (opening ??= openDatabase(name).catch((error: unknown) => {
-      console.warn(`[semantic-state] vector cache disabled: ${errorMessage(error)}`)
-      return null
-    }))
+    (opening ??= openDatabase(name).then(
+      (db) => {
+        // Another tab deleting or upgrading the database waits for this connection: let it go, reopen on next use.
+        db.onversionchange = () => {
+          db.close()
+          opening = null
+        }
+        db.onclose = () => {
+          opening = null
+        }
+        return db
+      },
+      (error: unknown) => {
+        console.warn(`[semantic-state] vector cache disabled: ${errorMessage(error)}`)
+        return null
+      },
+    ))
 
   return {
     async get(entries) {

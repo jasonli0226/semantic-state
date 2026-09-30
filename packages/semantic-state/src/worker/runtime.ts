@@ -116,11 +116,9 @@ export function createWorkerRuntime<T>(config: SemanticWorkerConfig<T>, port: Wo
   async function fromCache(incoming: readonly T[], supplied: readonly (readonly [Id, Vec])[] = []): Promise<(readonly [Id, Vec])[]> {
     if (!config.vectorCache) return []
     const given = new Map(supplied)
-    const wanted = incoming.flatMap((item) => {
-      const id = config.id(item)
-      const text = config.text(item)
-      return sourceOf(id, text, given, embeddedText) === 'stale' ? [[id, text] as const] : []
-    })
+    // One entry per id, with its last text: the one `upsert` keeps.
+    const latest = new Map(incoming.map((item) => [config.id(item), config.text(item)] as const))
+    const wanted = [...latest].filter(([id, text]) => sourceOf(id, text, given, embeddedText) === 'stale')
     if (wanted.length === 0) return []
     try {
       const found = await config.vectorCache.get(wanted)

@@ -7,10 +7,9 @@ links to an issue where the details and progress live. Suggestions welcome — o
 
 | Item | Issue |
 |---|---|
-| CI: typecheck, lint, unit tests and E2E on every PR | [#5](https://github.com/jasonli0226/semantic-state/issues/5) |
-| CI: pack-and-install smoke test for the published package | [#6](https://github.com/jasonli0226/semantic-state/issues/6) |
-| CHANGELOG and release checklist | [#7](https://github.com/jasonli0226/semantic-state/issues/7) |
 | Announce reorders to screen readers; keep focus stable when the list reorders | [#8](https://github.com/jasonli0226/semantic-state/issues/8) |
+| Hold belief values (confidence, reason), not just order, under the commit policy | [#23](https://github.com/jasonli0226/semantic-state/issues/23) |
+| Memory graph: deferred polish from the #22 reviews | [#27](https://github.com/jasonli0226/semantic-state/issues/27) |
 
 ## Next — 0.2
 
@@ -19,6 +18,8 @@ links to an issue where the details and progress live. Suggestions welcome — o
 | Approximate nearest-neighbour index for collections beyond ~10k items | [#11](https://github.com/jasonli0226/semantic-state/issues/11) |
 | Embedder options: WebGPU, and bring-your-own (server) embedders | [#12](https://github.com/jasonli0226/semantic-state/issues/12) |
 | Calibrate `Belief.confidence` | [#13](https://github.com/jasonli0226/semantic-state/issues/13) |
+| Cache query vectors in IndexedDB, opt-in, so a reload skips the model | [#34](https://github.com/jasonli0226/semantic-state/issues/34) |
+| Memory graph: live Wikipedia source and IndexedDB cache, measured against the baseline | [#26](https://github.com/jasonli0226/semantic-state/issues/26) |
 
 ## Later — exploring
 
@@ -27,6 +28,15 @@ links to an issue where the details and progress live. Suggestions welcome — o
 | Optional LLM re-ranking, opt-in, with prompt-injection guardrails | [#14](https://github.com/jasonli0226/semantic-state/issues/14) |
 | Better duplicate and negation handling | [#15](https://github.com/jasonli0226/semantic-state/issues/15) |
 | API review and a stable `0.1.0` | [#16](https://github.com/jasonli0226/semantic-state/issues/16) |
+
+## Done
+
+| Item | Issue |
+|---|---|
+| CI: typecheck, lint, unit tests and E2E on every PR | [#5](https://github.com/jasonli0226/semantic-state/issues/5) |
+| CI: pack-and-install smoke test for the published package | [#6](https://github.com/jasonli0226/semantic-state/issues/6) |
+| CHANGELOG and release checklist | [#7](https://github.com/jasonli0226/semantic-state/issues/7) |
+| Persist item vectors in IndexedDB | [#10](https://github.com/jasonli0226/semantic-state/issues/10) |
 
 ## Not planned
 
